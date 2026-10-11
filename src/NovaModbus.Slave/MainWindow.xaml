@@ -98,23 +98,69 @@
 
         <TabControl Grid.Column="1" Margin="0,8,8,8">
             <TabItem Header="Holding">
-                <DataGrid Margin="8" AutoGenerateColumns="False" IsReadOnly="False"
-                          ItemsSource="{Binding HoldingRows}">
-                    <DataGrid.Columns>
-                        <DataGridTextColumn Header="Address" Binding="{Binding Address, Mode=OneWay}" IsReadOnly="True"/>
-                        <DataGridTextColumn Header="Dec" Binding="{Binding ValueText, UpdateSourceTrigger=LostFocus}" Width="*"/>
-                        <DataGridTextColumn Header="Hex" Binding="{Binding HexText, Mode=OneWay}" IsReadOnly="True"/>
-                    </DataGrid.Columns>
-                </DataGrid>
+                <Grid Margin="8">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    <StackPanel Grid.Row="0" Orientation="Horizontal">
+                        <StackPanel Margin="0,0,8,0">
+                            <Label Content="Address"/>
+                            <TextBox Width="80" Text="{Binding HoldingAddressText, UpdateSourceTrigger=PropertyChanged}"/>
+                        </StackPanel>
+                        <StackPanel Margin="0,0,8,0">
+                            <Label Content="Value (dec/0x)"/>
+                            <TextBox Width="100" Text="{Binding HoldingValueText, UpdateSourceTrigger=PropertyChanged}"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Bottom">
+                            <Button Content="Add" Padding="16,2" Margin="0,0,4,1"
+                                    Command="{Binding AddHoldingCommand}"/>
+                            <Button Content="Del" Padding="16,2" Margin="0,0,8,1"
+                                    Command="{Binding RemoveHoldingCommand}"/>
+                            <Button Content="Save" Padding="16,2" Margin="0,0,4,1"
+                                    Command="{Binding SaveMapCommand}"/>
+                            <Button Content="Load" Padding="16,2" Margin="0,0,0,1"
+                                    Command="{Binding LoadMapCommand}"/>
+                        </StackPanel>
+                    </StackPanel>
+                    <DataGrid Grid.Row="1" Margin="0,8,0,0" AutoGenerateColumns="False" IsReadOnly="False"
+                              ItemsSource="{Binding HoldingRows}"
+                              SelectedItem="{Binding SelectedHoldingRow}">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Address" Binding="{Binding Address, Mode=OneWay}" IsReadOnly="True"/>
+                            <DataGridTextColumn Header="Dec" Binding="{Binding ValueText, UpdateSourceTrigger=LostFocus}" Width="*"/>
+                            <DataGridTextColumn Header="Hex" Binding="{Binding HexText, Mode=OneWay}" IsReadOnly="True"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </Grid>
             </TabItem>
             <TabItem Header="Coils">
-                <DataGrid Margin="8" AutoGenerateColumns="False"
-                          ItemsSource="{Binding CoilRows}">
-                    <DataGrid.Columns>
-                        <DataGridTextColumn Header="Address" Binding="{Binding Address, Mode=OneWay}" IsReadOnly="True"/>
-                        <DataGridCheckBoxColumn Header="On" Binding="{Binding IsOn, UpdateSourceTrigger=PropertyChanged}" Width="*"/>
-                    </DataGrid.Columns>
-                </DataGrid>
+                <Grid Margin="8">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    <StackPanel Grid.Row="0" Orientation="Horizontal">
+                        <StackPanel Margin="0,0,8,0">
+                            <Label Content="Address"/>
+                            <TextBox Width="80" Text="{Binding CoilAddressText, UpdateSourceTrigger=PropertyChanged}"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Bottom">
+                            <Button Content="Add" Padding="16,2" Margin="0,0,4,1"
+                                    Command="{Binding AddCoilCommand}"/>
+                            <Button Content="Del" Padding="16,2" Margin="0,0,0,1"
+                                    Command="{Binding RemoveCoilCommand}"/>
+                        </StackPanel>
+                    </StackPanel>
+                    <DataGrid Grid.Row="1" Margin="0,8,0,0" AutoGenerateColumns="False"
+                              ItemsSource="{Binding CoilRows}"
+                              SelectedItem="{Binding SelectedCoilRow}">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Address" Binding="{Binding Address, Mode=OneWay}" IsReadOnly="True"/>
+                            <DataGridCheckBoxColumn Header="On" Binding="{Binding IsOn, UpdateSourceTrigger=PropertyChanged}" Width="*"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </Grid>
             </TabItem>
             <TabItem Header="Counters">
                 <TextBox Margin="8" IsReadOnly="True" FontFamily="Consolas"

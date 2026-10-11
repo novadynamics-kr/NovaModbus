@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.Globalization;
+using System.IO;
 using System.Windows.Threading;
 using NovaModbus.Rtu;
 using NovaModbus.Rtu.Codecs;
@@ -13,6 +14,8 @@ namespace NovaModbus.Slave.ViewModels;
 public sealed class MainViewModel : ViewModelBase, IAsyncDisposable
 {
     private readonly Dictionary<byte, ModbusDataStore> _stores = [];
+    private readonly Dictionary<byte, List<(ushort Address, ushort Value)>> _holdingMaps = [];
+    private readonly Dictionary<byte, List<(ushort Address, bool IsOn)>> _coilMaps = [];
     private readonly DispatcherTimer _counterTimer;
     private ModbusRtuSlave? _slave;
     private SlaveServer? _server;
@@ -21,6 +24,11 @@ public sealed class MainViewModel : ViewModelBase, IAsyncDisposable
     private string _countersText = string.Empty;
     private string _newSlaveIdText = "1";
     private byte? _selectedSlaveId;
+    private string _holdingAddressText = "0";
+    private string _holdingValueText = "0";
+    private string _coilAddressText = "0";
+    private RegisterRow? _selectedHoldingRow;
+    private CoilRow? _selectedCoilRow;
     private string _floatAddressText = "0";
     private string _floatValueText = "0";
     private FloatOrderOption _floatOrder;
@@ -38,6 +46,12 @@ public sealed class MainViewModel : ViewModelBase, IAsyncDisposable
         AddSlaveCommand = new RelayCommand(AddSlave);
         RemoveSlaveCommand = new RelayCommand(RemoveSlave, () => SelectedSlaveId is not null);
         WriteFloatCommand = new RelayCommand(WriteFloat);
+        AddHoldingCommand = new RelayCommand(AddHolding);
+        RemoveHoldingCommand = new RelayCommand(RemoveHolding, () => SelectedHoldingRow is not null);
+        AddCoilCommand = new RelayCommand(AddCoil);
+        RemoveCoilCommand = new RelayCommand(RemoveCoil, () => SelectedCoilRow is not null);
+        SaveMapCommand = new RelayCommand(SaveMap);
+        LoadMapCommand = new RelayCommand(LoadMap);
         _counterTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
         _counterTimer.Tick += (_, _) => RefreshCounters();
         _counterTimer.Start();
@@ -135,6 +149,71 @@ public sealed class MainViewModel : ViewModelBase, IAsyncDisposable
 
     /// <summary>Remove the selected slave ID.</summary>
     public RelayCommand RemoveSlaveCommand { get; }
+
+    /// <summary>New holding address text.</summary>
+    public string HoldingAddressText
+    {
+        get => _holdingAddressText;
+        set => SetProperty(ref _holdingAddressText, value);
+    }
+
+    /// <summary>New holding value text (decimal or 0x hex).</summary>
+    public string HoldingValueText
+    {
+        get => _holdingValueText;
+        set => SetProperty(ref _holdingValueText, value);
+    }
+
+    /// <summary>New coil address text.</summary>
+    public string CoilAddressText
+    {
+        get => _coilAddressText;
+        set => SetProperty(ref _coilAddressText, value);
+    }
+
+    /// <summary>Selected holding row.</summary>
+    public RegisterRow? SelectedHoldingRow
+    {
+        get => _selectedHoldingRow;
+        set
+        {
+            if (SetProperty(ref _selectedHoldingRow, value))
+            {
+                RemoveHoldingCommand.RaiseCanExecuteChanged();
+            }
+        }
+    }
+
+    /// <summary>Selected coil row.</summary>
+    public CoilRow? SelectedCoilRow
+    {
+        get => _selectedCoilRow;
+        set
+        {
+            if (SetProperty(ref _selectedCoilRow, value))
+            {
+                RemoveCoilCommand.RaiseCanExecuteChanged();
+            }
+        }
+    }
+
+    /// <summary>Add a holding register to the user map.</summary>
+    public RelayCommand AddHoldingCommand { get; }
+
+    /// <summary>Remove the selected holding register from the map.</summary>
+    public RelayCommand RemoveHoldingCommand { get; }
+
+    /// <summary>Add a coil to the user map.</summary>
+    public RelayCommand AddCoilCommand { get; }
+
+    /// <summary>Remove the selected coil from the map.</summary>
+    public RelayCommand RemoveCoilCommand { get; }
+
+    /// <summary>Save the current ID map to a JSON file.</summary>
+    public RelayCommand SaveMapCommand { get; }
+
+    /// <summary>Load a map from a JSON file (replaces the current ID map).</summary>
+    public RelayCommand LoadMapCommand { get; }
 
     /// <summary>Supported float word orders (Endian display).</summary>
     public IReadOnlyList<FloatOrderOption> FloatOrderOptions { get; } =
@@ -262,6 +341,8 @@ public sealed class MainViewModel : ViewModelBase, IAsyncDisposable
 
         byte id = SelectedSlaveId.Value;
         _stores.Remove(id);
+        _holdingMaps.Remove(id);
+        _coilMaps.Remove(id);
         SlaveIds.Remove(id);
         _slave?.Engine.RemoveSlave(id);
         SelectedSlaveId = SlaveIds.Count > 0 ? SlaveIds[0] : null;
@@ -276,6 +357,8 @@ public sealed class MainViewModel : ViewModelBase, IAsyncDisposable
             return false;
         }
 
+        _holdingMaps[id] = [];
+        _coilMaps[id] = [];
         int index = SlaveIds.TakeWhile(existing => existing < id).Count();
         SlaveIds.Insert(index, id);
         SelectedSlaveId ??= id;
@@ -297,22 +380,221 @@ public sealed class MainViewModel : ViewModelBase, IAsyncDisposable
     {
         HoldingRows.Clear();
         CoilRows.Clear();
-        if (SelectedSlaveId is null || !_stores.TryGetValue(SelectedSlaveId.Value, out ModbusDataStore? store))
+        SelectedHoldingRow = null;
+        SelectedCoilRow = null;
+        if (SelectedSlaveId is null
+            || !_stores.TryGetValue(SelectedSlaveId.Value, out ModbusDataStore? store)
+            || !_holdingMaps.TryGetValue(SelectedSlaveId.Value, out List<(ushort Address, ushort Value)>? holdings)
+            || !_coilMaps.TryGetValue(SelectedSlaveId.Value, out List<(ushort Address, bool IsOn)>? coils))
         {
             return;
         }
 
-        for (int i = 0; i < store.HoldingCount; i++)
+        foreach ((ushort address, ushort _) in holdings.OrderBy(e => e.Address))
         {
-            ushort address = (ushort)i;
             HoldingRows.Add(new RegisterRow(address, store.ReadHolding(address, 1)[0],
                 (addr, val) => store.WriteHolding(addr, val)));
         }
 
-        foreach (bool coil in store.ReadCoils(0, (ushort)store.CoilCount))
+        foreach ((ushort address, bool _) in coils.OrderBy(e => e.Address))
         {
-            ushort address = (ushort)CoilRows.Count;
-            CoilRows.Add(new CoilRow(address, coil, store.WriteCoil));
+            CoilRows.Add(new CoilRow(address, store.ReadCoils(address, 1)[0], store.WriteCoil));
+        }
+    }
+
+    private void AddHolding()
+    {
+        try
+        {
+            ModbusDataStore store = RequireStore();
+            if (!ushort.TryParse(HoldingAddressText, out ushort address) || address >= store.HoldingCount)
+            {
+                StatusText = $"Invalid address: '{HoldingAddressText}'.";
+                return;
+            }
+
+            ushort value = ParseUshortValue(HoldingValueText);
+            List<(ushort Address, ushort Value)> map = _holdingMaps[SelectedSlaveId!.Value];
+            if (map.Any(e => e.Address == address))
+            {
+                StatusText = $"Address {address} already in the map.";
+                return;
+            }
+
+            store.WriteHolding(address, value);
+            map.Add((address, value));
+            StatusText = string.Empty;
+            RefreshRows();
+        }
+        catch (Exception ex)
+        {
+            StatusText = $"Error: {ex.Message}";
+        }
+    }
+
+    private void RemoveHolding()
+    {
+        if (SelectedHoldingRow is null || SelectedSlaveId is null)
+        {
+            return;
+        }
+
+        _holdingMaps[SelectedSlaveId.Value].RemoveAll(e => e.Address == SelectedHoldingRow.Address);
+        RefreshRows();
+    }
+
+    private void AddCoil()
+    {
+        try
+        {
+            ModbusDataStore store = RequireStore();
+            if (!ushort.TryParse(CoilAddressText, out ushort address) || address >= store.CoilCount)
+            {
+                StatusText = $"Invalid address: '{CoilAddressText}'.";
+                return;
+            }
+
+            List<(ushort Address, bool IsOn)> map = _coilMaps[SelectedSlaveId!.Value];
+            if (map.Any(e => e.Address == address))
+            {
+                StatusText = $"Address {address} already in the map.";
+                return;
+            }
+
+            map.Add((address, false));
+            StatusText = string.Empty;
+            RefreshRows();
+        }
+        catch (Exception ex)
+        {
+            StatusText = $"Error: {ex.Message}";
+        }
+    }
+
+    private void RemoveCoil()
+    {
+        if (SelectedCoilRow is null || SelectedSlaveId is null)
+        {
+            return;
+        }
+
+        _coilMaps[SelectedSlaveId.Value].RemoveAll(e => e.Address == SelectedCoilRow.Address);
+        RefreshRows();
+    }
+
+    private void SaveMap()
+    {
+        try
+        {
+            ModbusDataStore store = RequireStore();
+            Microsoft.Win32.SaveFileDialog dialog = new()
+            {
+                Filter = "Register map (*.json)|*.json",
+                FileName = $"slave{SelectedSlaveId!.Value}-map.json",
+            };
+            if (dialog.ShowDialog() != true)
+            {
+                return;
+            }
+
+            List<RegisterMapStore.HoldingMapItem> holdings = _holdingMaps[SelectedSlaveId.Value]
+                .OrderBy(e => e.Address)
+                .Select(e => new RegisterMapStore.HoldingMapItem(e.Address, store.ReadHolding(e.Address, 1)[0]))
+                .ToList();
+            List<RegisterMapStore.CoilMapItem> coils = _coilMaps[SelectedSlaveId.Value]
+                .OrderBy(e => e.Address)
+                .Select(e => new RegisterMapStore.CoilMapItem(e.Address, store.ReadCoils(e.Address, 1)[0]))
+                .ToList();
+            RegisterMapStore.Save(dialog.FileName, holdings, coils);
+            StatusText = $"Saved to {dialog.FileName}.";
+        }
+        catch (Exception ex)
+        {
+            StatusText = $"Error: {ex.Message}";
+        }
+    }
+
+    private void LoadMap()
+    {
+        try
+        {
+            ModbusDataStore store = RequireStore();
+            Microsoft.Win32.OpenFileDialog dialog = new()
+            {
+                Filter = "Register map (*.json)|*.json",
+            };
+            if (dialog.ShowDialog() != true)
+            {
+                return;
+            }
+
+            RegisterMapStore.RegisterMapFile file = RegisterMapStore.Load(dialog.FileName);
+            foreach (RegisterMapStore.HoldingMapItem item in file.Holding)
+            {
+                if (item.Address >= store.HoldingCount)
+                {
+                    throw new InvalidDataException($"Address {item.Address} out of range.");
+                }
+            }
+
+            foreach (RegisterMapStore.CoilMapItem item in file.Coils)
+            {
+                if (item.Address >= store.CoilCount)
+                {
+                    throw new InvalidDataException($"Coil {item.Address} out of range.");
+                }
+            }
+
+            List<(ushort Address, ushort Value)> holdings = file.Holding
+                .GroupBy(e => e.Address).Select(g => g.First())
+                .OrderBy(e => e.Address).Select(e => (e.Address, e.Value)).ToList();
+            List<(ushort Address, bool IsOn)> coils = file.Coils
+                .GroupBy(e => e.Address).Select(g => g.First())
+                .OrderBy(e => e.Address).Select(e => (e.Address, e.IsOn)).ToList();
+
+            foreach ((ushort address, ushort value) in holdings)
+            {
+                store.WriteHolding(address, value);
+            }
+
+            foreach ((ushort address, bool isOn) in coils)
+            {
+                store.WriteCoil(address, isOn);
+            }
+
+            _holdingMaps[SelectedSlaveId!.Value] = holdings;
+            _coilMaps[SelectedSlaveId.Value] = coils;
+            StatusText = $"Loaded {holdings.Count} holding, {coils.Count} coils from {dialog.FileName}.";
+            RefreshRows();
+        }
+        catch (Exception ex)
+        {
+            StatusText = $"Error: {ex.Message}";
+        }
+    }
+
+    private ModbusDataStore RequireStore()
+    {
+        if (SelectedSlaveId is null || !_stores.TryGetValue(SelectedSlaveId.Value, out ModbusDataStore? store))
+        {
+            throw new InvalidOperationException("Select a slave ID.");
+        }
+
+        return store;
+    }
+
+    private static ushort ParseUshortValue(string text)
+    {
+        string trimmed = text.Trim();
+        try
+        {
+            return trimmed.StartsWith("0x", StringComparison.OrdinalIgnoreCase)
+                ? Convert.ToUInt16(trimmed[2..], 16)
+                : ushort.Parse(trimmed, null);
+        }
+        catch (Exception ex) when (ex is FormatException or OverflowException)
+        {
+            throw new ArgumentException($"Invalid value: '{text}'.", ex);
         }
     }
 
