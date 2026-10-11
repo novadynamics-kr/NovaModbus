@@ -101,8 +101,10 @@ Rules:
 1. **Duplicate search first** — before opening an issue, search symptoms
    once. If an open issue covers it, attach analysis there instead.
 2. **Self-assign at start** — single developer, so no lock protocol.
-   `gh issue edit <n> --add-assignee @me` marks the issue in-progress,
-   which is what a resumed session reads to know the state.
+   `gh issue edit <n> --add-assignee '@me'` (PowerShell: quoted) marks the
+   issue in-progress, which is what a resumed session reads to know the
+   state. If the token scope rejects assignee edit, skip it and record
+   in-progress state in `docs/orders/` instead.
 3. **Approval scope** — step approval covers commit + push of the task
    branch. Merge-to-main, `gh pr create` (optional), and issue close each
    need a separate explicit go-ahead. The director writes issue comments
