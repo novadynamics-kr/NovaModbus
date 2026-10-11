@@ -2,6 +2,15 @@
 
 Windows .NET 10 기반 Modbus RTU 솔루션용 에이전트 규칙.
 
+## 0. Agent Bootstrap (read order)
+
+1. `AGENTS.md` (this file)
+2. `rules/hyper-waterfall.md` — Hyper-Waterfall 방법론 (NovaModbus 커스터마이즈)
+3. `rules/docs-and-git-workflow.md` — 문서·Git·gh 운영 절차
+4. 작업 시: `docs/orders/<today>.md` → 최신 `docs/working/*` → `docs/plans/*` → 관련 `docs/feedback/*`·`docs/tech/*`
+
+구체 문서가 요약과 다르면 구체 문서를 따른다.
+
 ## 1. 솔루션 개요
 
 - `NovaModbus.sln`
@@ -89,7 +98,29 @@ Logging/ — IModbusLogger (Action<string> 기반, 외부 로거 의존 없음)
 - 필수 테스트: CRC 벡터(공식 예제 포함), 각 FC encode/decode round-trip, CRC 불일치 거부, Exception 프레임 파싱, `ModbusDataStore` 경계 검사, 멀티 ID 라우팅, `FakeSerialTransport` 기반 Client↔Slave 루프백.
 - 실물 COM포트 필요 테스트는 `[TestCategory("Hardware")]` + `Skip` 기본, CI에서 제외.
 
-## 7. Do Not
+## 7. Hyper-Waterfall (methodology)
+
+출처: <https://github.com/edwardkim/rhwp> — 1인 개발·.NET 단일 솔루션 규모에
+맞게 축소 커스터마이즈. 정본은 `rules/`를 따른다.
+
+- **거시 워터폴 + 미시 애자일**: 계획→설계→구현→검증→통합 흐름을 문서로
+  통제하고, 단계 내 실행은 AI 빠른 반복으로 수 시간 사이클 완성.
+- **3원칙**: (P1) 목표·규칙을 파일에 유지 (`AGENTS.md`+`rules/`+`docs/`),
+  (P2) 통제권은 작업지시자 — AI가 종료 선언 금지, 아키텍처 변경은 승인 필수,
+  (P3) 컨텍스트 유지 주기적 확인 — 결정사항은 채팅이 아닌 파일에 외부화.
+- **사이클**: Issue 등록(중복 검색 우선) → AI 계획서(3-6단계) → 승인 →
+  단계별 구현+보고서 → 단계별 승인 → 피드백(`docs/feedback/`, 사람이 작성) →
+  최종 보고 → 승인 후 merge·close. 1단계 = 1커밋(코드+문서 함께).
+- **품질 관문**: 계획 승인 → `build` 무경고 → `test` 전체 통과 →
+  Modbus 스펙 벡터 대조 → 회귀 없음(기존 테스트 전부 녹색, 기준 완화 금지).
+- **GitHub는 로컬 `gh` CLI로만**: 단계 승인이 task 브랜치 push까지 포함.
+  main merge·PR(선택)·close는 별도 승인. 작업 브랜치는 최신 `main` 기준
+  `task/<issue>-<slug>`, 승인 후 main에 직접 merge (PR 불필요, hotfix는
+  main 직접 커밋 허용). `gh auth login` 선행 필요.
+  상세 절차·템플릿은 `rules/docs-and-git-workflow.md`.
+- 바이브 코딩 전락 조건: 계획 없는 구현, 미검증 수락, "좋은 것 같습니다" 승인.
+
+## 8. Do Not
 
 - `.git/`, `obj/`, `bin/` 직접 편집 금지.
 - `src/*.csproj`에 UI·Modbus 서드파티 `PackageReference` 추가 금지.
