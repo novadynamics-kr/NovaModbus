@@ -520,9 +520,9 @@ public sealed class WatchViewModel : ViewModelBase, IDisposable
                 return;
             }
 
-            if (end - start + 1 > 1000)
+            if (end - start + 1 > ModbusLimits.MaxBulkAdd)
             {
-                StatusText = "Range too large (max 1000).";
+                StatusText = $"Range too large (max {ModbusLimits.MaxBulkAdd}).";
                 return;
             }
 

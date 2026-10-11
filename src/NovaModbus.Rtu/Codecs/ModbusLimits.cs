@@ -35,4 +35,7 @@ public static class ModbusLimits
 
     /// <summary>Max address value (0xFFFF).</summary>
     public const int MaxAddress = 0xFFFF;
+
+    /// <summary>Max bulk-add item count (UI range operations).</summary>
+    public const int MaxBulkAdd = 65535;
 }
