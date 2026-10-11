@@ -45,7 +45,7 @@ public sealed class LoopbackTests
         try
         {
             ModbusSlaveException ex = await Assert.ThrowsExactlyAsync<ModbusSlaveException>(
-                () => client.ReadHoldingRegistersAsync(1, 999, 2));
+                () => client.ReadHoldingRegistersAsync(1, 0xFFFF, 2));
             Assert.AreEqual((byte)0x02, ex.ExceptionCode);
         }
         finally

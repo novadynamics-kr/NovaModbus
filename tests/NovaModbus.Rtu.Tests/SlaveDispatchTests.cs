@@ -109,7 +109,7 @@ public sealed class SlaveDispatchTests
     public void OutOfRangeReadGivesIllegalDataAddress()
     {
         ModbusRtuSlave slave = CreateSlave();
-        byte[]? response = slave.HandleRequest(Request(1, 0x03, ReadRegistersCodec.EncodeRequest(999, 2)));
+        byte[]? response = slave.HandleRequest(Request(1, 0x03, ReadRegistersCodec.EncodeRequest(0xFFFF, 2)));
         Assert.AreEqual(ModbusExceptionCode.IllegalDataAddress, DecodeException(response, 0x03));
     }
 

@@ -1,3 +1,5 @@
+using NovaModbus.Rtu.Codecs;
+
 namespace NovaModbus.Rtu.Tests;
 
 [TestClass]
@@ -56,5 +58,37 @@ public sealed class DataStoreTests
         ModbusDataStore store = new(coilCount: 8, discreteCount: 8, holdingCount: 8, inputCount: 8);
         Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => store.ReadDiscrete(8, 1));
         Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => store.ReadInput(7, 2));
+    }
+
+    [TestMethod]
+    public void DefaultStoreCoversFullAddressRange()
+    {
+        ModbusDataStore store = new();
+        Assert.AreEqual(ModbusLimits.MaxAddress + 1, store.CoilCount);
+        Assert.AreEqual(ModbusLimits.MaxAddress + 1, store.HoldingCount);
+        Assert.AreEqual(ModbusLimits.MaxAddress + 1, store.DiscreteCount);
+        Assert.AreEqual(ModbusLimits.MaxAddress + 1, store.InputCount);
+    }
+
+    [TestMethod]
+    public void TopEndAddressesRoundTrip()
+    {
+        ModbusDataStore store = new();
+        store.WriteHolding(0xFFFF, 0xABCD);
+        Assert.AreEqual((ushort)0xABCD, store.ReadHolding(0xFFFF, 1)[0]);
+        store.WriteCoil(0xFFFF, true);
+        Assert.IsTrue(store.ReadCoils(0xFFFF, 1)[0]);
+        store.WriteInput(0xFFFF, [7]);
+        Assert.AreEqual((ushort)7, store.ReadInput(0xFFFF, 1)[0]);
+        store.WriteDiscrete(0xFFFF, [true]);
+        Assert.IsTrue(store.ReadDiscrete(0xFFFF, 1)[0]);
+    }
+
+    [TestMethod]
+    public void RangeOverflowPastTopEndThrows()
+    {
+        ModbusDataStore store = new();
+        Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => store.ReadHolding(0xFFFF, 2));
+        Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => store.ReadCoils(0xFFFF, 2));
     }
 }

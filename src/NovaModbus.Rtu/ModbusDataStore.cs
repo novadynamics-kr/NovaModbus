@@ -20,8 +20,12 @@ public sealed class ModbusDataStore
     private int _busyCount;
     private int _eventCount;
 
-    /// <summary>Initializes a store with the given capacities.</summary>
-    public ModbusDataStore(int coilCount = 1000, int discreteCount = 1000, int holdingCount = 1000, int inputCount = 1000)
+    /// <summary>Initializes a store with the given capacities (defaults cover 0x0000-0xFFFF).</summary>
+    public ModbusDataStore(
+        int coilCount = ModbusLimits.MaxAddress + 1,
+        int discreteCount = ModbusLimits.MaxAddress + 1,
+        int holdingCount = ModbusLimits.MaxAddress + 1,
+        int inputCount = ModbusLimits.MaxAddress + 1)
     {
         ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(coilCount, 0);
         ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(discreteCount, 0);

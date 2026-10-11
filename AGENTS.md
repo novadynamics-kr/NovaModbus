@@ -72,7 +72,7 @@ ModbusConnection.cs — transport+client 생명주기 (Serial/Virtual)
 SlaveServer.cs — slave 구동 루프
 ModbusRtuClient.cs — timeout/retry, async + CancellationToken
 ModbusRtuSlave.cs — SlaveId 필터, Exception 응답 생성
-ModbusDataStore.cs — Coils/Discrete/Holding/Input, lock 기반 thread-safe
+ModbusDataStore.cs — Coils/Discrete/Holding/Input, lock 기반 thread-safe (기본 전 범위 0x0000-0xFFFF)
 ModbusSlaveEngine.cs — 멀티 ID 딕셔너리 + per-ID 카운터
 Errors/ — ModbusException, CrcMismatchException 등
 Logging/ — IModbusLogger (Action<string> 기반, 외부 로거 의존 없음)
