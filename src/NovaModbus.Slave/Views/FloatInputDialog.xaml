@@ -1,0 +1,18 @@
+<Window x:Class="NovaModbus.Slave.Views.FloatInputDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Write Float" Height="280" Width="340"
+        WindowStartupLocation="CenterOwner" ResizeMode="NoResize">
+    <StackPanel Margin="12">
+        <TextBlock Name="AddressText" FontWeight="Bold"/>
+        <Label Content="Float value" Margin="0,8,0,0"/>
+        <TextBox Name="ValueBox" Text="0"/>
+        <Label Content="Word order" Margin="0,8,0,0"/>
+        <ComboBox Name="OrderBox" DisplayMemberPath="Display"/>
+        <TextBlock Name="ErrorText" Foreground="Red" Margin="0,8,0,0" TextWrapping="Wrap"/>
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
+            <Button Content="OK" Width="75" Margin="0,0,8,0" Click="OnOk"/>
+            <Button Content="Cancel" Width="75" IsCancel="True"/>
+        </StackPanel>
+    </StackPanel>
+</Window>

@@ -26,9 +26,9 @@ public sealed class MainViewModel : ViewModelBase, IAsyncDisposable
     private byte? _selectedSlaveId;
     private string _holdingAddressText = "0";
     private string _holdingValueText = "0";
+    private string _holdingEndText = "9";
     private string _coilAddressText = "0";
-    private RegisterRow? _selectedHoldingRow;
-    private CoilRow? _selectedCoilRow;
+    private string _coilEndText = "9";
     private string _floatAddressText = "0";
     private string _floatValueText = "0";
     private FloatOrderOption _floatOrder;
@@ -47,9 +47,9 @@ public sealed class MainViewModel : ViewModelBase, IAsyncDisposable
         RemoveSlaveCommand = new RelayCommand(RemoveSlave, () => SelectedSlaveId is not null);
         WriteFloatCommand = new RelayCommand(WriteFloat);
         AddHoldingCommand = new RelayCommand(AddHolding);
-        RemoveHoldingCommand = new RelayCommand(RemoveHolding, () => SelectedHoldingRow is not null);
         AddCoilCommand = new RelayCommand(AddCoil);
-        RemoveCoilCommand = new RelayCommand(RemoveCoil, () => SelectedCoilRow is not null);
+        AddHoldingRangeCommand = new RelayCommand(AddHoldingRange);
+        AddCoilRangeCommand = new RelayCommand(AddCoilRange);
         SaveMapCommand = new RelayCommand(SaveMap);
         LoadMapCommand = new RelayCommand(LoadMap);
         _counterTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
@@ -171,43 +171,31 @@ public sealed class MainViewModel : ViewModelBase, IAsyncDisposable
         set => SetProperty(ref _coilAddressText, value);
     }
 
-    /// <summary>Selected holding row.</summary>
-    public RegisterRow? SelectedHoldingRow
+    /// <summary>Bulk-add end address text (holding).</summary>
+    public string HoldingEndText
     {
-        get => _selectedHoldingRow;
-        set
-        {
-            if (SetProperty(ref _selectedHoldingRow, value))
-            {
-                RemoveHoldingCommand.RaiseCanExecuteChanged();
-            }
-        }
+        get => _holdingEndText;
+        set => SetProperty(ref _holdingEndText, value);
     }
 
-    /// <summary>Selected coil row.</summary>
-    public CoilRow? SelectedCoilRow
+    /// <summary>Bulk-add end address text (coils).</summary>
+    public string CoilEndText
     {
-        get => _selectedCoilRow;
-        set
-        {
-            if (SetProperty(ref _selectedCoilRow, value))
-            {
-                RemoveCoilCommand.RaiseCanExecuteChanged();
-            }
-        }
+        get => _coilEndText;
+        set => SetProperty(ref _coilEndText, value);
     }
 
     /// <summary>Add a holding register to the user map.</summary>
     public RelayCommand AddHoldingCommand { get; }
 
-    /// <summary>Remove the selected holding register from the map.</summary>
-    public RelayCommand RemoveHoldingCommand { get; }
+    /// <summary>Add a holding address range to the user map.</summary>
+    public RelayCommand AddHoldingRangeCommand { get; }
 
     /// <summary>Add a coil to the user map.</summary>
     public RelayCommand AddCoilCommand { get; }
 
-    /// <summary>Remove the selected coil from the map.</summary>
-    public RelayCommand RemoveCoilCommand { get; }
+    /// <summary>Add a coil address range to the user map.</summary>
+    public RelayCommand AddCoilRangeCommand { get; }
 
     /// <summary>Save the current ID map to a JSON file.</summary>
     public RelayCommand SaveMapCommand { get; }
@@ -216,13 +204,7 @@ public sealed class MainViewModel : ViewModelBase, IAsyncDisposable
     public RelayCommand LoadMapCommand { get; }
 
     /// <summary>Supported float word orders (Endian display).</summary>
-    public IReadOnlyList<FloatOrderOption> FloatOrderOptions { get; } =
-    [
-        new(FloatWordOrder.Abcd, FloatWordOrderText.ToDisplayString(FloatWordOrder.Abcd)),
-        new(FloatWordOrder.Badc, FloatWordOrderText.ToDisplayString(FloatWordOrder.Badc)),
-        new(FloatWordOrder.Cdab, FloatWordOrderText.ToDisplayString(FloatWordOrder.Cdab)),
-        new(FloatWordOrder.Dcba, FloatWordOrderText.ToDisplayString(FloatWordOrder.Dcba)),
-    ];
+    public IReadOnlyList<FloatOrderOption> FloatOrderOptions { get; } = FloatOrderOption.All;
 
     /// <summary>Float write address text.</summary>
     public string FloatAddressText
@@ -380,8 +362,6 @@ public sealed class MainViewModel : ViewModelBase, IAsyncDisposable
     {
         HoldingRows.Clear();
         CoilRows.Clear();
-        SelectedHoldingRow = null;
-        SelectedCoilRow = null;
         if (SelectedSlaveId is null
             || !_stores.TryGetValue(SelectedSlaveId.Value, out ModbusDataStore? store)
             || !_holdingMaps.TryGetValue(SelectedSlaveId.Value, out List<(ushort Address, ushort Value)>? holdings)
@@ -432,14 +412,31 @@ public sealed class MainViewModel : ViewModelBase, IAsyncDisposable
         }
     }
 
-    private void RemoveHolding()
+    /// <summary>Remove holding registers from the map (multi-select).</summary>
+    public void RemoveHoldings(IEnumerable<ushort> addresses)
     {
-        if (SelectedHoldingRow is null || SelectedSlaveId is null)
+        ArgumentNullException.ThrowIfNull(addresses);
+        if (SelectedSlaveId is null || !_holdingMaps.TryGetValue(SelectedSlaveId.Value, out List<(ushort Address, ushort Value)>? map))
         {
             return;
         }
 
-        _holdingMaps[SelectedSlaveId.Value].RemoveAll(e => e.Address == SelectedHoldingRow.Address);
+        HashSet<ushort> doomed = [.. addresses];
+        map.RemoveAll(e => doomed.Contains(e.Address));
+        RefreshRows();
+    }
+
+    /// <summary>Remove coils from the map (multi-select).</summary>
+    public void RemoveCoils(IEnumerable<ushort> addresses)
+    {
+        ArgumentNullException.ThrowIfNull(addresses);
+        if (SelectedSlaveId is null || !_coilMaps.TryGetValue(SelectedSlaveId.Value, out List<(ushort Address, bool IsOn)>? map))
+        {
+            return;
+        }
+
+        HashSet<ushort> doomed = [.. addresses];
+        map.RemoveAll(e => doomed.Contains(e.Address));
         RefreshRows();
     }
 
@@ -471,15 +468,104 @@ public sealed class MainViewModel : ViewModelBase, IAsyncDisposable
         }
     }
 
-    private void RemoveCoil()
+    private void AddHoldingRange()
     {
-        if (SelectedCoilRow is null || SelectedSlaveId is null)
+        try
         {
-            return;
+            ModbusDataStore store = RequireStore();
+            ushort start = ParseMapAddress(HoldingAddressText, store.HoldingCount);
+            ushort end = ParseMapAddress(HoldingEndText, store.HoldingCount);
+            if (end < start)
+            {
+                StatusText = $"Invalid range: '{HoldingAddressText}-{HoldingEndText}'.";
+                return;
+            }
+
+            if (end - start + 1 > 1000)
+            {
+                StatusText = "Range too large (max 1000).";
+                return;
+            }
+
+            ushort value = ParseUshortValue(HoldingValueText);
+            List<(ushort Address, ushort Value)> map = _holdingMaps[SelectedSlaveId!.Value];
+            int added = 0;
+            int skipped = 0;
+            for (int address = start; address <= end; address++)
+            {
+                ushort a = (ushort)address;
+                if (map.Any(e => e.Address == a))
+                {
+                    skipped++;
+                    continue;
+                }
+
+                store.WriteHolding(a, value);
+                map.Add((a, value));
+                added++;
+            }
+
+            StatusText = $"Added {added}, skipped {skipped}.";
+            RefreshRows();
+        }
+        catch (Exception ex)
+        {
+            StatusText = $"Error: {ex.Message}";
+        }
+    }
+
+    private void AddCoilRange()
+    {
+        try
+        {
+            ModbusDataStore store = RequireStore();
+            ushort start = ParseMapAddress(CoilAddressText, store.CoilCount);
+            ushort end = ParseMapAddress(CoilEndText, store.CoilCount);
+            if (end < start)
+            {
+                StatusText = $"Invalid range: '{CoilAddressText}-{CoilEndText}'.";
+                return;
+            }
+
+            if (end - start + 1 > 1000)
+            {
+                StatusText = "Range too large (max 1000).";
+                return;
+            }
+
+            List<(ushort Address, bool IsOn)> map = _coilMaps[SelectedSlaveId!.Value];
+            int added = 0;
+            int skipped = 0;
+            for (int address = start; address <= end; address++)
+            {
+                ushort a = (ushort)address;
+                if (map.Any(e => e.Address == a))
+                {
+                    skipped++;
+                    continue;
+                }
+
+                map.Add((a, false));
+                added++;
+            }
+
+            StatusText = $"Added {added}, skipped {skipped}.";
+            RefreshRows();
+        }
+        catch (Exception ex)
+        {
+            StatusText = $"Error: {ex.Message}";
+        }
+    }
+
+    private static ushort ParseMapAddress(string text, int capacity)
+    {
+        if (!ushort.TryParse(text, out ushort address) || address >= capacity)
+        {
+            throw new ArgumentException($"Invalid address: '{text}'.");
         }
 
-        _coilMaps[SelectedSlaveId.Value].RemoveAll(e => e.Address == SelectedCoilRow.Address);
-        RefreshRows();
+        return address;
     }
 
     private void SaveMap()
@@ -625,6 +711,24 @@ public sealed class MainViewModel : ViewModelBase, IAsyncDisposable
 
     private void WriteFloat()
     {
+        if (!ushort.TryParse(FloatAddressText, out ushort address))
+        {
+            StatusText = $"Invalid address: '{FloatAddressText}'.";
+            return;
+        }
+
+        if (!float.TryParse(FloatValueText, NumberStyles.Float, CultureInfo.InvariantCulture, out float value))
+        {
+            StatusText = $"Invalid float: '{FloatValueText}'.";
+            return;
+        }
+
+        WriteFloatAt(address, value, FloatOrder.Order);
+    }
+
+    /// <summary>Write a float to the selected slave store (dialog + tab share this).</summary>
+    public void WriteFloatAt(ushort address, float value, FloatWordOrder order)
+    {
         try
         {
             if (SelectedSlaveId is null || !_stores.TryGetValue(SelectedSlaveId.Value, out ModbusDataStore? store))
@@ -633,21 +737,15 @@ public sealed class MainViewModel : ViewModelBase, IAsyncDisposable
                 return;
             }
 
-            if (!ushort.TryParse(FloatAddressText, out ushort address) || address + 1 >= store.HoldingCount)
+            if (address + 1 >= store.HoldingCount)
             {
-                StatusText = $"Invalid address: '{FloatAddressText}' (needs 2 registers).";
+                StatusText = $"Invalid address: '{address}' (needs 2 registers).";
                 return;
             }
 
-            if (!float.TryParse(FloatValueText, NumberStyles.Float, CultureInfo.InvariantCulture, out float value))
-            {
-                StatusText = $"Invalid float: '{FloatValueText}'.";
-                return;
-            }
-
-            ushort[] regs = Float32Codec.Encode(value, FloatOrder.Order);
+            ushort[] regs = Float32Codec.Encode(value, order);
             store.WriteHolding(address, regs);
-            StatusText = $"Wrote {value} as 0x{regs[0]:X4} 0x{regs[1]:X4} @ {address} ({FloatOrder.Display}).";
+            StatusText = $"Wrote {value} as 0x{regs[0]:X4} 0x{regs[1]:X4} @ {address} ({FloatWordOrderText.ToDisplayString(order)}).";
             RefreshRows();
         }
         catch (Exception ex)

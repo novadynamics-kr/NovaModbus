@@ -109,23 +109,32 @@
                             <TextBox Width="80" Text="{Binding HoldingAddressText, UpdateSourceTrigger=PropertyChanged}"/>
                         </StackPanel>
                         <StackPanel Margin="0,0,8,0">
+                            <Label Content="End (range)"/>
+                            <TextBox Width="80" Text="{Binding HoldingEndText, UpdateSourceTrigger=PropertyChanged}"/>
+                        </StackPanel>
+                        <StackPanel Margin="0,0,8,0">
                             <Label Content="Value (dec/0x)"/>
                             <TextBox Width="100" Text="{Binding HoldingValueText, UpdateSourceTrigger=PropertyChanged}"/>
                         </StackPanel>
                         <StackPanel Orientation="Horizontal" VerticalAlignment="Bottom">
                             <Button Content="Add" Padding="16,2" Margin="0,0,4,1"
                                     Command="{Binding AddHoldingCommand}"/>
+                            <Button Content="Add Range" Padding="16,2" Margin="0,0,4,1"
+                                    Command="{Binding AddHoldingRangeCommand}"/>
                             <Button Content="Del" Padding="16,2" Margin="0,0,8,1"
-                                    Command="{Binding RemoveHoldingCommand}"/>
+                                    Click="OnHoldingDelete"/>
                             <Button Content="Save" Padding="16,2" Margin="0,0,4,1"
                                     Command="{Binding SaveMapCommand}"/>
                             <Button Content="Load" Padding="16,2" Margin="0,0,0,1"
                                     Command="{Binding LoadMapCommand}"/>
                         </StackPanel>
                     </StackPanel>
-                    <DataGrid Grid.Row="1" Margin="0,8,0,0" AutoGenerateColumns="False" IsReadOnly="False"
+                    <DataGrid Grid.Row="1" Margin="0,8,0,0" Name="HoldingGrid"
+                              AutoGenerateColumns="False" IsReadOnly="False"
+                              SelectionMode="Extended"
                               ItemsSource="{Binding HoldingRows}"
-                              SelectedItem="{Binding SelectedHoldingRow}">
+                              KeyDown="OnGridDeleteKey"
+                              MouseRightButtonUp="OnHoldingRightClick">
                         <DataGrid.Columns>
                             <DataGridTextColumn Header="Address" Binding="{Binding Address, Mode=OneWay}" IsReadOnly="True"/>
                             <DataGridTextColumn Header="Dec" Binding="{Binding ValueText, UpdateSourceTrigger=LostFocus}" Width="*"/>
@@ -145,16 +154,24 @@
                             <Label Content="Address"/>
                             <TextBox Width="80" Text="{Binding CoilAddressText, UpdateSourceTrigger=PropertyChanged}"/>
                         </StackPanel>
+                        <StackPanel Margin="0,0,8,0">
+                            <Label Content="End (range)"/>
+                            <TextBox Width="80" Text="{Binding CoilEndText, UpdateSourceTrigger=PropertyChanged}"/>
+                        </StackPanel>
                         <StackPanel Orientation="Horizontal" VerticalAlignment="Bottom">
                             <Button Content="Add" Padding="16,2" Margin="0,0,4,1"
                                     Command="{Binding AddCoilCommand}"/>
+                            <Button Content="Add Range" Padding="16,2" Margin="0,0,4,1"
+                                    Command="{Binding AddCoilRangeCommand}"/>
                             <Button Content="Del" Padding="16,2" Margin="0,0,0,1"
-                                    Command="{Binding RemoveCoilCommand}"/>
+                                    Click="OnCoilDelete"/>
                         </StackPanel>
                     </StackPanel>
-                    <DataGrid Grid.Row="1" Margin="0,8,0,0" AutoGenerateColumns="False"
+                    <DataGrid Grid.Row="1" Margin="0,8,0,0" Name="CoilGrid"
+                              AutoGenerateColumns="False"
+                              SelectionMode="Extended"
                               ItemsSource="{Binding CoilRows}"
-                              SelectedItem="{Binding SelectedCoilRow}">
+                              KeyDown="OnGridDeleteKey">
                         <DataGrid.Columns>
                             <DataGridTextColumn Header="Address" Binding="{Binding Address, Mode=OneWay}" IsReadOnly="True"/>
                             <DataGridCheckBoxColumn Header="On" Binding="{Binding IsOn, UpdateSourceTrigger=PropertyChanged}" Width="*"/>
