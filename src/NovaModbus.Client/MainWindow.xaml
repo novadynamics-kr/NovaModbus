@@ -66,8 +66,8 @@
         </StackPanel>
         </Grid>
 
-        <TabControl Grid.Column="1" Margin="0,8,8,8" DataContext="{Binding ReadWrite}">
-            <TabItem Header="Read / Write">
+        <TabControl Grid.Column="1" Margin="0,8,8,8">
+            <TabItem Header="Read / Write" DataContext="{Binding ReadWrite}">
                 <Grid Margin="8">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
@@ -109,6 +109,32 @@
                              VerticalScrollBarVisibility="Auto"
                              Text="{Binding ResultText, Mode=OneWay}"/>
                 </Grid>
+            </TabItem>
+            <TabItem Header="Polling" DataContext="{Binding Polling}">
+                <Grid Margin="8">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    <StackPanel Grid.Row="0" Orientation="Horizontal">
+                        <StackPanel Margin="0,0,8,0">
+                            <Label Content="Interval (ms)"/>
+                            <TextBox Width="100" Text="{Binding IntervalMsText, UpdateSourceTrigger=PropertyChanged}"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Bottom">
+                            <Button Content="Start" Padding="16,2" Margin="0,0,4,1"
+                                    Command="{Binding StartCommand}"/>
+                            <Button Content="Stop" Padding="16,2" Margin="0,0,0,1"
+                                    Command="{Binding StopCommand}"/>
+                        </StackPanel>
+                    </StackPanel>
+                    <ListBox Grid.Row="1" Margin="0,8,0,0" FontFamily="Consolas"
+                             ItemsSource="{Binding History}"/>
+                </Grid>
+            </TabItem>
+            <TabItem Header="Log" DataContext="{Binding CommLog}">
+                <ListBox Margin="8" FontFamily="Consolas"
+                         ItemsSource="{Binding Lines}"/>
             </TabItem>
         </TabControl>
     </Grid>

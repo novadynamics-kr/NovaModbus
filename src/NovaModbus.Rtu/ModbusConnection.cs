@@ -1,3 +1,4 @@
+using NovaModbus.Rtu.Logging;
 using NovaModbus.Rtu.Transport;
 
 namespace NovaModbus.Rtu;
@@ -5,7 +6,14 @@ namespace NovaModbus.Rtu;
 /// <summary>Owns one open transport + client pair (serial or virtual).</summary>
 public sealed class ModbusConnection : IAsyncDisposable
 {
+    private readonly IModbusLogger _logger;
     private ISerialTransport? _transport;
+
+    /// <summary>Initializes a connection using the given logger for traffic.</summary>
+    public ModbusConnection(IModbusLogger? logger = null)
+    {
+        _logger = logger ?? NullModbusLogger.Instance;
+    }
 
     /// <summary>Active client, or null when disconnected.</summary>
     public ModbusRtuClient? Client { get; private set; }
@@ -51,7 +59,7 @@ public sealed class ModbusConnection : IAsyncDisposable
     private void Attach(ISerialTransport transport, int baudRate)
     {
         _transport = transport;
-        Client = new ModbusRtuClient(transport, baudRate);
+        Client = new ModbusRtuClient(transport, baudRate, _logger);
         ConnectionChanged?.Invoke(this, EventArgs.Empty);
     }
 

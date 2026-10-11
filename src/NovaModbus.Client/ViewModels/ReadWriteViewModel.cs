@@ -122,11 +122,24 @@ public sealed class ReadWriteViewModel : ViewModelBase
         IsBusy = true;
         try
         {
+            await RunOnceAsync(cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    /// <summary>Run the configured request once, updating <see cref="ResultText"/>.</summary>
+    public async Task<string> RunOnceAsync(CancellationToken cancellationToken = default)
+    {
+        try
+        {
             ModbusRtuClient? client = _clientProvider();
             if (client is null)
             {
                 ResultText = "Not connected.";
-                return;
+                return ResultText;
             }
 
             byte slaveId = ParseSlaveId();
@@ -148,10 +161,8 @@ public sealed class ReadWriteViewModel : ViewModelBase
         {
             ResultText = $"Error: {ex.Message}";
         }
-        finally
-        {
-            IsBusy = false;
-        }
+
+        return ResultText;
     }
 
     private async Task<string> WriteSingleCoilAsync(ModbusRtuClient client, byte slaveId, ushort start, CancellationToken ct)

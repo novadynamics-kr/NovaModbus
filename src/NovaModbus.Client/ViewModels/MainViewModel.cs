@@ -20,7 +20,10 @@ public sealed class MainViewModel : ViewModelBase, IAsyncDisposable
     public MainViewModel()
     {
         SerialSettings = new SerialPortSettingsViewModel(_bus);
+        Connection = new ModbusConnection(CommLog);
         ReadWrite = new ReadWriteViewModel(() => Connection.Client);
+        Polling = new PollingViewModel(ReadWrite);
+        Connection.ConnectionChanged += OnConnectionChanged;
 
         var (held, published) = VirtualTransport.CreatePair();
         _bus.Publish(TestSlaveEndpoint, published);
@@ -30,7 +33,6 @@ public sealed class MainViewModel : ViewModelBase, IAsyncDisposable
         _ = _testSlaveServer.RunAsync(_lifetime.Token);
 
         SerialSettings.RefreshPorts();
-        Connection.ConnectionChanged += OnConnectionChanged;
         ConnectCommand = new AsyncRelayCommand(ConnectAsync, () => !Connection.IsConnected, OnError);
         DisconnectCommand = new AsyncRelayCommand(DisconnectAsync, () => Connection.IsConnected, OnError);
     }
@@ -41,8 +43,14 @@ public sealed class MainViewModel : ViewModelBase, IAsyncDisposable
     /// <summary>Single-shot function execution tab.</summary>
     public ReadWriteViewModel ReadWrite { get; }
 
+    /// <summary>Polling tab.</summary>
+    public PollingViewModel Polling { get; }
+
+    /// <summary>Raw traffic log.</summary>
+    public ObservableLogger CommLog { get; } = new();
+
     /// <summary>Active connection (serial or virtual).</summary>
-    public ModbusConnection Connection { get; } = new();
+    public ModbusConnection Connection { get; }
 
     /// <summary>Whether a transport is open.</summary>
     public bool IsConnected => Connection.IsConnected;
@@ -106,6 +114,7 @@ public sealed class MainViewModel : ViewModelBase, IAsyncDisposable
         }
 
         _disposed = true;
+        Polling.Dispose();
         await Connection.DisposeAsync().ConfigureAwait(false);
         await _lifetime.CancelAsync().ConfigureAwait(false);
         _bus.Unpublish(TestSlaveEndpoint);
