@@ -19,6 +19,9 @@ public sealed class RegisterRow : ViewModelBase
     /// <summary>Register address (read-only).</summary>
     public ushort Address { get; }
 
+    /// <summary>Address as hex (read-only, e.g. 0x000A).</summary>
+    public string AddressHex => $"0x{Address:X4}";
+
     /// <summary>Hex value (read-only, e.g. 0x022B).</summary>
     public string HexText
     {

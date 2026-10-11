@@ -387,12 +387,7 @@ public sealed class MainViewModel : ViewModelBase, IAsyncDisposable
         try
         {
             ModbusDataStore store = RequireStore();
-            if (!ushort.TryParse(HoldingAddressText, out ushort address) || address >= store.HoldingCount)
-            {
-                StatusText = $"Invalid address: '{HoldingAddressText}'.";
-                return;
-            }
-
+            ushort address = ParseHexAddress(HoldingAddressText, store.HoldingCount);
             ushort value = ParseUshortValue(HoldingValueText);
             List<(ushort Address, ushort Value)> map = _holdingMaps[SelectedSlaveId!.Value];
             if (map.Any(e => e.Address == address))
@@ -445,12 +440,7 @@ public sealed class MainViewModel : ViewModelBase, IAsyncDisposable
         try
         {
             ModbusDataStore store = RequireStore();
-            if (!ushort.TryParse(CoilAddressText, out ushort address) || address >= store.CoilCount)
-            {
-                StatusText = $"Invalid address: '{CoilAddressText}'.";
-                return;
-            }
-
+            ushort address = ParseHexAddress(CoilAddressText, store.CoilCount);
             List<(ushort Address, bool IsOn)> map = _coilMaps[SelectedSlaveId!.Value];
             if (map.Any(e => e.Address == address))
             {
@@ -560,9 +550,28 @@ public sealed class MainViewModel : ViewModelBase, IAsyncDisposable
 
     private static ushort ParseMapAddress(string text, int capacity)
     {
-        if (!ushort.TryParse(text, out ushort address) || address >= capacity)
+        ushort address = ParseHexAddress(text, capacity);
+        return address;
+    }
+
+    private static ushort ParseHexAddress(string text, int capacity)
+    {
+        string trimmed = text.Trim();
+        ushort address;
+        try
         {
-            throw new ArgumentException($"Invalid address: '{text}'.");
+            address = trimmed.StartsWith("0x", StringComparison.OrdinalIgnoreCase)
+                ? Convert.ToUInt16(trimmed[2..], 16)
+                : ushort.Parse(trimmed, null);
+        }
+        catch (Exception ex) when (ex is FormatException or OverflowException)
+        {
+            throw new ArgumentException($"Invalid address: '{text}'.", ex);
+        }
+
+        if (address >= capacity)
+        {
+            throw new ArgumentException($"Address out of range: '{text}'.");
         }
 
         return address;
@@ -711,7 +720,12 @@ public sealed class MainViewModel : ViewModelBase, IAsyncDisposable
 
     private void WriteFloat()
     {
-        if (!ushort.TryParse(FloatAddressText, out ushort address))
+        ushort address;
+        try
+        {
+            address = ParseHexAddress(FloatAddressText, ushort.MaxValue + 1);
+        }
+        catch (ArgumentException)
         {
             StatusText = $"Invalid address: '{FloatAddressText}'.";
             return;
