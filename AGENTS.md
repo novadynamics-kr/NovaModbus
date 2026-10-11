@@ -62,7 +62,14 @@ Codecs/ — Fc01,02,03,04,05,06,15,16 요청/응답 파서
 Transport/
   ISerialTransport.cs — interface (테스트용 Fake 주입)
   SystemPortsSerialTransport.cs — System.IO.Ports 어댑터
-  RtuFramer.cs — 3.5char silent interval 기반 프레임 분리
+  RtuFramer.cs — 3.5char silent interval 기반 프레임 분리 + ReadFrameAsync
+  SerialPortDiscovery.cs — 시스템 포트 열거
+  VirtualTransport.cs / VirtualSerialBus.cs — 인메모리 가상 라인
+  TransportFactory.cs — Serial/Virtual 단일 호출점
+Commands/ — RelayCommand, AsyncRelayCommand (컨텍스트 마샬 내장)
+ModbusTransaction.cs — 요청/응답 교환 + 재시도
+ModbusConnection.cs — transport+client 생명주기 (Serial/Virtual)
+SlaveServer.cs — slave 구동 루프
 ModbusRtuClient.cs — timeout/retry, async + CancellationToken
 ModbusRtuSlave.cs — SlaveId 필터, Exception 응답 생성
 ModbusDataStore.cs — Coils/Discrete/Holding/Input, lock 기반 thread-safe
@@ -91,6 +98,12 @@ Logging/ — IModbusLogger (Action<string> 기반, 외부 로거 의존 없음)
 - `SerialPort` 직접 노출 금지. 항상 `ISerialTransport` 경유.
 - 매직넘버 금지: FC 코드·예외 코드·타이밍 상수는 enum/const.
 - 로그에 원시 바이트는 대문자 Hex + 공백 구분 (`01 03 00 00 00 0A C5 CD`).
+- UI 스레드 규칙 (트러블슈팅 `docs/troubleshootings/cross-thread-command.md`):
+  `INotifyPropertyChanged` 쓰기는 어느 스레드든 가능 (바인딩 엔진이 마샬).
+  `ObservableCollection`, `CanExecuteChanged`, UI 직접 접근은 UI 스레드 강제.
+  새 `ICommand`는 `Rtu.Commands` 사용 (생성 시점 컨텍스트 캡처·마샬 내장).
+  `ObservableLogger`는 Dispatcher 마샬済. 테스트에서 커스텀 컨텍스트 하에
+  `await` 금지 (continuation이 Drain을 기다려 데드락 — 블로킹 대기 사용).
 
 ## 6. 테스트 규칙 (MSTest)
 

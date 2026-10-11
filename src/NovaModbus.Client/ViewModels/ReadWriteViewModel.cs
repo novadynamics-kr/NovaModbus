@@ -1,4 +1,4 @@
-using NovaModbus.Client.Services;
+using NovaModbus.Rtu.Commands;
 using NovaModbus.Rtu;
 using NovaModbus.Rtu.Enums;
 

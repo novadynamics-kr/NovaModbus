@@ -1,16 +1,17 @@
 using System.Windows.Input;
 
-namespace NovaModbus.Client.Services;
+namespace NovaModbus.Rtu.Commands;
 
-/// <summary>Async <see cref="ICommand"/> with reentrancy guard and error routing.</summary>
+/// <summary>Async <see cref="ICommand"/> with reentrancy guard, error routing, and context marshal.</summary>
 public sealed class AsyncRelayCommand : ICommand
 {
     private readonly Func<CancellationToken, Task> _execute;
     private readonly Func<bool>? _canExecute;
     private readonly Action<Exception>? _onError;
+    private readonly SynchronizationContext? _context = SynchronizationContext.Current;
     private int _executing;
 
-    /// <summary>Initializes a command.</summary>
+    /// <summary>Initializes a command (captures the current sync context for event/error marshal).</summary>
     public AsyncRelayCommand(Func<Task> execute, Func<bool>? canExecute = null, Action<Exception>? onError = null)
         : this(_ => execute(), canExecute, onError)
     {
@@ -47,7 +48,7 @@ public sealed class AsyncRelayCommand : ICommand
         }
         catch (Exception ex)
         {
-            _onError?.Invoke(ex);
+            ReportError(ex);
         }
         finally
         {
@@ -56,6 +57,35 @@ public sealed class AsyncRelayCommand : ICommand
         }
     }
 
-    /// <summary>Re-query <see cref="CanExecute"/>.</summary>
-    public void RaiseCanExecuteChanged() => CanExecuteChanged?.Invoke(this, EventArgs.Empty);
+    /// <summary>Re-query <see cref="CanExecute"/> on the captured context.</summary>
+    public void RaiseCanExecuteChanged()
+    {
+        if (_context is null)
+        {
+            Raise();
+        }
+        else
+        {
+            _context.Post(_ => Raise(), null);
+        }
+    }
+
+    private void Raise() => CanExecuteChanged?.Invoke(this, EventArgs.Empty);
+
+    private void ReportError(Exception ex)
+    {
+        if (_onError is null)
+        {
+            return;
+        }
+
+        if (_context is null)
+        {
+            _onError(ex);
+        }
+        else
+        {
+            _context.Post(_ => _onError(ex), null);
+        }
+    }
 }

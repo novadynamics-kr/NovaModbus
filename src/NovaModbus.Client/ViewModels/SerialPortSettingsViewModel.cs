@@ -1,5 +1,5 @@
 using System.Collections.ObjectModel;
-using NovaModbus.Client.Services;
+using NovaModbus.Rtu.Commands;
 using NovaModbus.Rtu.Transport;
 
 namespace NovaModbus.Client.ViewModels;
