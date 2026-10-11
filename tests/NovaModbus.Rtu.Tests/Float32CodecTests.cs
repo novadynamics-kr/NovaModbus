@@ -44,4 +44,13 @@ public sealed class Float32CodecTests
         ushort[] one = [0x3F80];
         Assert.ThrowsExactly<ArgumentException>(() => Float32Codec.Decode(one, FloatWordOrder.Abcd));
     }
+
+    [TestMethod]
+    public void DisplayStringsUseEndianTerms()
+    {
+        Assert.AreEqual("Big Endian (ABCD)", FloatWordOrderText.ToDisplayString(FloatWordOrder.Abcd));
+        Assert.AreEqual("Little Endian (DCBA)", FloatWordOrderText.ToDisplayString(FloatWordOrder.Dcba));
+        Assert.IsTrue(FloatWordOrderText.ToDisplayString(FloatWordOrder.Badc).Contains("Big Endian", StringComparison.Ordinal));
+        Assert.IsTrue(FloatWordOrderText.ToDisplayString(FloatWordOrder.Cdab).Contains("Little Endian", StringComparison.Ordinal));
+    }
 }

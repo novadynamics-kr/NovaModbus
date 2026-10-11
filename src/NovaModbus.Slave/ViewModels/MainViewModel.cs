@@ -23,7 +23,7 @@ public sealed class MainViewModel : ViewModelBase, IAsyncDisposable
     private byte? _selectedSlaveId;
     private string _floatAddressText = "0";
     private string _floatValueText = "0";
-    private FloatWordOrder _floatOrder = FloatWordOrder.Abcd;
+    private FloatOrderOption _floatOrder;
     private bool _ignoreCrcErrors = true;
     private bool _simulateBusy;
     private bool _disposed;
@@ -31,6 +31,7 @@ public sealed class MainViewModel : ViewModelBase, IAsyncDisposable
     /// <summary>Initializes settings, log, default ID, and the counter timer.</summary>
     public MainViewModel()
     {
+        _floatOrder = FloatOrderOptions[0];
         SerialSettings = new SlaveSerialSettingsViewModel();
         StartCommand = new AsyncRelayCommand(StartAsync, () => !IsRunning, OnError);
         StopCommand = new AsyncRelayCommand(StopAsync, () => IsRunning, OnError);
@@ -135,13 +136,13 @@ public sealed class MainViewModel : ViewModelBase, IAsyncDisposable
     /// <summary>Remove the selected slave ID.</summary>
     public RelayCommand RemoveSlaveCommand { get; }
 
-    /// <summary>Supported float word orders.</summary>
-    public IReadOnlyList<FloatWordOrder> FloatOrders { get; } =
+    /// <summary>Supported float word orders (Endian display).</summary>
+    public IReadOnlyList<FloatOrderOption> FloatOrderOptions { get; } =
     [
-        FloatWordOrder.Abcd,
-        FloatWordOrder.Cdab,
-        FloatWordOrder.Badc,
-        FloatWordOrder.Dcba,
+        new(FloatWordOrder.Abcd, FloatWordOrderText.ToDisplayString(FloatWordOrder.Abcd)),
+        new(FloatWordOrder.Badc, FloatWordOrderText.ToDisplayString(FloatWordOrder.Badc)),
+        new(FloatWordOrder.Cdab, FloatWordOrderText.ToDisplayString(FloatWordOrder.Cdab)),
+        new(FloatWordOrder.Dcba, FloatWordOrderText.ToDisplayString(FloatWordOrder.Dcba)),
     ];
 
     /// <summary>Float write address text.</summary>
@@ -158,8 +159,8 @@ public sealed class MainViewModel : ViewModelBase, IAsyncDisposable
         set => SetProperty(ref _floatValueText, value);
     }
 
-    /// <summary>Float word order.</summary>
-    public FloatWordOrder FloatOrder
+    /// <summary>Float word order choice.</summary>
+    public FloatOrderOption FloatOrder
     {
         get => _floatOrder;
         set => SetProperty(ref _floatOrder, value);
@@ -362,9 +363,9 @@ public sealed class MainViewModel : ViewModelBase, IAsyncDisposable
                 return;
             }
 
-            ushort[] regs = Float32Codec.Encode(value, FloatOrder);
+            ushort[] regs = Float32Codec.Encode(value, FloatOrder.Order);
             store.WriteHolding(address, regs);
-            StatusText = $"Wrote {value} as 0x{regs[0]:X4} 0x{regs[1]:X4} @ {address} ({FloatOrder}).";
+            StatusText = $"Wrote {value} as 0x{regs[0]:X4} 0x{regs[1]:X4} @ {address} ({FloatOrder.Display}).";
             RefreshRows();
         }
         catch (Exception ex)

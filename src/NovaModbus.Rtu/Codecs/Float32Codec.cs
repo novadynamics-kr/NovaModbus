@@ -59,3 +59,17 @@ public static class Float32Codec
 
     private static ushort Swap(ushort value) => (ushort)(((value & 0xFF) << 8) | (value >> 8));
 }
+
+/// <summary>Display names for <see cref="FloatWordOrder"/>.</summary>
+public static class FloatWordOrderText
+{
+    /// <summary>Big/Little Endian display name (e.g. "Big Endian (ABCD)").</summary>
+    public static string ToDisplayString(FloatWordOrder order) => order switch
+    {
+        FloatWordOrder.Abcd => "Big Endian (ABCD)",
+        FloatWordOrder.Badc => "Big Endian, Byte Swap (BADC)",
+        FloatWordOrder.Cdab => "Little Endian, Byte Swap (CDAB)",
+        FloatWordOrder.Dcba => "Little Endian (DCBA)",
+        _ => throw new ArgumentOutOfRangeException(nameof(order), "Unknown word order."),
+    };
+}

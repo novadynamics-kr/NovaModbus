@@ -12,11 +12,23 @@ public sealed class RegisterRow : ViewModelBase
         ArgumentNullException.ThrowIfNull(commit);
         Address = address;
         _valueText = value.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        _hexText = ToHex(value);
         _commit = commit;
     }
 
     /// <summary>Register address (read-only).</summary>
     public ushort Address { get; }
+
+    /// <summary>Hex value (read-only, e.g. 0x022B).</summary>
+    public string HexText
+    {
+        get => _hexText;
+        private set => SetProperty(ref _hexText, value);
+    }
+
+    private string _hexText;
+
+    private static string ToHex(ushort value) => $"0x{value:X4}";
 
     /// <summary>Value text (decimal or 0x hex); commits on valid input.</summary>
     public string ValueText
@@ -43,6 +55,7 @@ public sealed class RegisterRow : ViewModelBase
             {
                 _commit(Address, parsed);
                 SetProperty(ref _valueText, text);
+                HexText = ToHex(parsed);
             }
             catch (Exception)
             {
