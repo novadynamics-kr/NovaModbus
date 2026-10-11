@@ -23,7 +23,7 @@ public sealed class WatchViewModel : ViewModelBase, IDisposable
         ArgumentNullException.ThrowIfNull(clientProvider);
         _clientProvider = clientProvider;
         AddCommand = new RelayCommand(AddEntry);
-        AddRangeCommand = new RelayCommand(AddRange);
+        AddRangeCommand = new AsyncRelayCommand(AddRangeAsync, () => !IsBulkWorking, OnError);
         ReadAllCommand = new AsyncRelayCommand(ReadAllAsync, () => !IsBusy, OnError);
         SaveWatchCommand = new RelayCommand(SaveWatch);
         LoadWatchCommand = new RelayCommand(LoadWatch);
@@ -46,10 +46,48 @@ public sealed class WatchViewModel : ViewModelBase, IDisposable
     ];
 
     /// <summary>Registered entries.</summary>
-    public ObservableCollection<WatchEntry> Entries { get; } = [];
+    public ObservableCollection<WatchEntry> Entries
+    {
+        get => _entries;
+        private set => SetProperty(ref _entries, value);
+    }
+
+    private ObservableCollection<WatchEntry> _entries = [];
 
     /// <summary>Result rows (1:1 with entries).</summary>
-    public ObservableCollection<WatchResult> Results { get; } = [];
+    public ObservableCollection<WatchResult> Results
+    {
+        get => _results;
+        private set => SetProperty(ref _results, value);
+    }
+
+    private ObservableCollection<WatchResult> _results = [];
+
+    private readonly HashSet<WatchEntry> _entryIndex = [];
+
+    /// <summary>Bulk operation progress (0-100).</summary>
+    public double BulkProgress
+    {
+        get => _bulkProgress;
+        private set => SetProperty(ref _bulkProgress, value);
+    }
+
+    private double _bulkProgress;
+
+    /// <summary>Whether a bulk operation runs.</summary>
+    public bool IsBulkWorking
+    {
+        get => _isBulkWorking;
+        private set
+        {
+            if (SetProperty(ref _isBulkWorking, value))
+            {
+                AddRangeCommand.RaiseCanExecuteChanged();
+            }
+        }
+    }
+
+    private bool _isBulkWorking;
 
     /// <summary>New-entry slave ID text.</summary>
     public string SlaveIdText
@@ -99,7 +137,7 @@ public sealed class WatchViewModel : ViewModelBase, IDisposable
     public RelayCommand AddCommand { get; }
 
     /// <summary>Add entries for the address range.</summary>
-    public RelayCommand AddRangeCommand { get; }
+    public AsyncRelayCommand AddRangeCommand { get; }
 
     /// <summary>Save the watch list to a JSON file.</summary>
     public RelayCommand SaveWatchCommand { get; }
@@ -171,8 +209,14 @@ public sealed class WatchViewModel : ViewModelBase, IDisposable
     {
         try
         {
+            if (IsBulkWorking)
+            {
+                StatusText = "Bulk add running.";
+                return;
+            }
+
             WatchEntry entry = ParseEntry();
-            if (Entries.Contains(entry))
+            if (!_entryIndex.Add(entry))
             {
                 StatusText = "Already in the list.";
                 return;
@@ -206,6 +250,7 @@ public sealed class WatchViewModel : ViewModelBase, IDisposable
         foreach (WatchEntry entry in Entries.Where(doomed.Contains).ToArray())
         {
             Entries.Remove(entry);
+            _entryIndex.Remove(entry);
         }
     }
 
@@ -246,13 +291,20 @@ public sealed class WatchViewModel : ViewModelBase, IDisposable
             }
 
             WatchEntry[] loaded = WatchListStore.Load(dialog.FileName);
-            Entries.Clear();
-            Results.Clear();
+            _entryIndex.Clear();
+            List<WatchEntry> entries = new(loaded.Length);
+            List<WatchResult> rows = new(loaded.Length);
             foreach (WatchEntry entry in loaded)
             {
-                Entries.Add(entry);
-                Results.Add(new WatchResult(entry));
+                if (_entryIndex.Add(entry))
+                {
+                    entries.Add(entry);
+                    rows.Add(new WatchResult(entry));
+                }
             }
+
+            Entries = new ObservableCollection<WatchEntry>(entries);
+            Results = new ObservableCollection<WatchResult>(rows);
 
             StatusText = $"Loaded {loaded.Length} entries from {dialog.FileName}.";
         }
@@ -507,13 +559,18 @@ public sealed class WatchViewModel : ViewModelBase, IDisposable
         return new WatchEntry(slaveId, Area, start, count, ExtraText.Trim());
     }
 
-    private void AddRange()
+    private async Task AddRangeAsync(CancellationToken cancellationToken)
     {
+        byte slaveId;
+        ushort start;
+        ushort end;
+        ushort count;
+        string extra;
         try
         {
-            byte slaveId = ParseSlaveId();
-            ushort start = ParseUshortHex(StartText, "address");
-            ushort end = ParseUshortHex(AddressEndText, "end address");
+            slaveId = ParseSlaveId();
+            start = ParseUshortHex(StartText, "address");
+            end = ParseUshortHex(AddressEndText, "end address");
             if (end < start)
             {
                 StatusText = $"Invalid range: '{StartText}-{AddressEndText}'.";
@@ -526,31 +583,62 @@ public sealed class WatchViewModel : ViewModelBase, IDisposable
                 return;
             }
 
-            ushort count = ParseCount();
+            count = ParseCount();
             ValidateEntryLimits(count);
             ValidateExtra();
-            string extra = ExtraText.Trim();
-            int added = 0;
-            int skipped = 0;
-            for (int address = start; address <= end; address++)
-            {
-                WatchEntry entry = new(slaveId, Area, (ushort)address, count, extra);
-                if (Entries.Contains(entry))
-                {
-                    skipped++;
-                    continue;
-                }
-
-                Entries.Add(entry);
-                Results.Add(new WatchResult(entry));
-                added++;
-            }
-
-            StatusText = $"Added {added}, skipped {skipped}.";
+            extra = ExtraText.Trim();
         }
         catch (Exception ex)
         {
             StatusText = $"Error: {ex.Message}";
+            return;
+        }
+
+        WatchArea area = Area;
+        IsBulkWorking = true;
+        BulkProgress = 0;
+        try
+        {
+            List<WatchEntry> fresh = await Task.Run(() =>
+            {
+                List<WatchEntry> batch = new(end - start + 1);
+                for (int address = start; address <= end; address++)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    WatchEntry entry = new(slaveId, area, (ushort)address, count, extra);
+                    lock (_entryIndex)
+                    {
+                        if (_entryIndex.Add(entry))
+                        {
+                            batch.Add(entry);
+                        }
+                    }
+
+                    if ((address - start) % 512 == 0)
+                    {
+                        BulkProgress = 100.0 * (address - start + 1) / (end - start + 1);
+                    }
+                }
+
+                return batch;
+            }, cancellationToken).ConfigureAwait(false);
+
+            foreach (WatchEntry entry in fresh)
+            {
+                Entries.Add(entry);
+                Results.Add(new WatchResult(entry));
+            }
+
+            StatusText = $"Added {fresh.Count}, skipped {end - start + 1 - fresh.Count}.";
+        }
+        catch (Exception ex)
+        {
+            StatusText = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            IsBulkWorking = false;
+            BulkProgress = 0;
         }
     }
 

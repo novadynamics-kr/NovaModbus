@@ -101,6 +101,7 @@
                 <Grid Margin="8">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
                     <StackPanel Grid.Row="0" Orientation="Horizontal">
@@ -129,7 +130,10 @@
                                     Command="{Binding LoadMapCommand}"/>
                         </StackPanel>
                     </StackPanel>
-                    <DataGrid Grid.Row="1" Margin="0,8,0,0" Name="HoldingGrid"
+                    <ProgressBar Grid.Row="1" Margin="0,8,0,0" Height="10"
+                                 Minimum="0" Maximum="100"
+                                 Value="{Binding BulkProgress, Mode=OneWay}"/>
+                    <DataGrid Grid.Row="2" Margin="0,8,0,0" Name="HoldingGrid"
                               AutoGenerateColumns="False" IsReadOnly="False"
                               SelectionMode="Extended"
                               ItemsSource="{Binding HoldingRows}"
@@ -147,6 +151,7 @@
             <TabItem Header="Coils">
                 <Grid Margin="8">
                     <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
@@ -168,7 +173,10 @@
                                     Click="OnCoilDelete"/>
                         </StackPanel>
                     </StackPanel>
-                    <DataGrid Grid.Row="1" Margin="0,8,0,0" Name="CoilGrid"
+                    <ProgressBar Grid.Row="1" Margin="0,8,0,0" Height="10"
+                                 Minimum="0" Maximum="100"
+                                 Value="{Binding BulkProgress, Mode=OneWay}"/>
+                    <DataGrid Grid.Row="2" Margin="0,8,0,0" Name="CoilGrid"
                               AutoGenerateColumns="False"
                               SelectionMode="Extended"
                               ItemsSource="{Binding CoilRows}"

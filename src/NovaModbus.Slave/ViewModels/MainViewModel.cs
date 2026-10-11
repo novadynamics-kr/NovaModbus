@@ -14,8 +14,8 @@ namespace NovaModbus.Slave.ViewModels;
 public sealed class MainViewModel : ViewModelBase, IAsyncDisposable
 {
     private readonly Dictionary<byte, ModbusDataStore> _stores = [];
-    private readonly Dictionary<byte, List<(ushort Address, ushort Value)>> _holdingMaps = [];
-    private readonly Dictionary<byte, List<(ushort Address, bool IsOn)>> _coilMaps = [];
+    private readonly Dictionary<byte, Dictionary<ushort, ushort>> _holdingMaps = [];
+    private readonly Dictionary<byte, HashSet<ushort>> _coilMaps = [];
     private readonly DispatcherTimer _counterTimer;
     private ModbusRtuSlave? _slave;
     private SlaveServer? _server;
@@ -29,6 +29,8 @@ public sealed class MainViewModel : ViewModelBase, IAsyncDisposable
     private string _holdingEndText = "9";
     private string _coilAddressText = "0";
     private string _coilEndText = "9";
+    private double _bulkProgress;
+    private bool _isBulkWorking;
     private string _floatAddressText = "0";
     private string _floatValueText = "0";
     private FloatOrderOption _floatOrder;
@@ -48,8 +50,8 @@ public sealed class MainViewModel : ViewModelBase, IAsyncDisposable
         WriteFloatCommand = new RelayCommand(WriteFloat);
         AddHoldingCommand = new RelayCommand(AddHolding);
         AddCoilCommand = new RelayCommand(AddCoil);
-        AddHoldingRangeCommand = new RelayCommand(AddHoldingRange);
-        AddCoilRangeCommand = new RelayCommand(AddCoilRange);
+        AddHoldingRangeCommand = new AsyncRelayCommand(AddHoldingRangeAsync, () => !IsBulkWorking, OnError);
+        AddCoilRangeCommand = new AsyncRelayCommand(AddCoilRangeAsync, () => !IsBulkWorking, OnError);
         SaveMapCommand = new RelayCommand(SaveMap);
         LoadMapCommand = new RelayCommand(LoadMap);
         _counterTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
@@ -90,10 +92,43 @@ public sealed class MainViewModel : ViewModelBase, IAsyncDisposable
     }
 
     /// <summary>Holding-register editor rows for the selected ID.</summary>
-    public ObservableCollection<RegisterRow> HoldingRows { get; } = [];
+    public ObservableCollection<RegisterRow> HoldingRows
+    {
+        get => _holdingRows;
+        private set => SetProperty(ref _holdingRows, value);
+    }
+
+    private ObservableCollection<RegisterRow> _holdingRows = [];
 
     /// <summary>Coil editor rows for the selected ID.</summary>
-    public ObservableCollection<CoilRow> CoilRows { get; } = [];
+    public ObservableCollection<CoilRow> CoilRows
+    {
+        get => _coilRows;
+        private set => SetProperty(ref _coilRows, value);
+    }
+
+    private ObservableCollection<CoilRow> _coilRows = [];
+
+    /// <summary>Bulk operation progress (0-100).</summary>
+    public double BulkProgress
+    {
+        get => _bulkProgress;
+        private set => SetProperty(ref _bulkProgress, value);
+    }
+
+    /// <summary>Whether a bulk operation runs.</summary>
+    public bool IsBulkWorking
+    {
+        get => _isBulkWorking;
+        private set
+        {
+            if (SetProperty(ref _isBulkWorking, value))
+            {
+                AddHoldingRangeCommand.RaiseCanExecuteChanged();
+                AddCoilRangeCommand.RaiseCanExecuteChanged();
+            }
+        }
+    }
 
     /// <summary>Counter text.</summary>
     public string CountersText
@@ -189,13 +224,13 @@ public sealed class MainViewModel : ViewModelBase, IAsyncDisposable
     public RelayCommand AddHoldingCommand { get; }
 
     /// <summary>Add a holding address range to the user map.</summary>
-    public RelayCommand AddHoldingRangeCommand { get; }
+    public AsyncRelayCommand AddHoldingRangeCommand { get; }
 
     /// <summary>Add a coil to the user map.</summary>
     public RelayCommand AddCoilCommand { get; }
 
     /// <summary>Add a coil address range to the user map.</summary>
-    public RelayCommand AddCoilRangeCommand { get; }
+    public AsyncRelayCommand AddCoilRangeCommand { get; }
 
     /// <summary>Save the current ID map to a JSON file.</summary>
     public RelayCommand SaveMapCommand { get; }
@@ -360,44 +395,55 @@ public sealed class MainViewModel : ViewModelBase, IAsyncDisposable
 
     private void RefreshRows()
     {
-        HoldingRows.Clear();
-        CoilRows.Clear();
         if (SelectedSlaveId is null
             || !_stores.TryGetValue(SelectedSlaveId.Value, out ModbusDataStore? store)
-            || !_holdingMaps.TryGetValue(SelectedSlaveId.Value, out List<(ushort Address, ushort Value)>? holdings)
-            || !_coilMaps.TryGetValue(SelectedSlaveId.Value, out List<(ushort Address, bool IsOn)>? coils))
+            || !_holdingMaps.TryGetValue(SelectedSlaveId.Value, out Dictionary<ushort, ushort>? holdings)
+            || !_coilMaps.TryGetValue(SelectedSlaveId.Value, out HashSet<ushort>? coils))
         {
+            HoldingRows = [];
+            CoilRows = [];
             return;
         }
 
-        foreach ((ushort address, ushort _) in holdings.OrderBy(e => e.Address))
+        List<RegisterRow> holdingRows = new(holdings.Count);
+        foreach (ushort address in holdings.Keys.OrderBy(a => a))
         {
-            HoldingRows.Add(new RegisterRow(address, store.ReadHolding(address, 1)[0],
+            holdingRows.Add(new RegisterRow(address, store.ReadHolding(address, 1)[0],
                 (addr, val) => store.WriteHolding(addr, val)));
         }
 
-        foreach ((ushort address, bool _) in coils.OrderBy(e => e.Address))
+        List<CoilRow> coilRows = new(coils.Count);
+        foreach (ushort address in coils.OrderBy(a => a))
         {
-            CoilRows.Add(new CoilRow(address, store.ReadCoils(address, 1)[0], store.WriteCoil));
+            coilRows.Add(new CoilRow(address, store.ReadCoils(address, 1)[0], store.WriteCoil));
         }
+
+        HoldingRows = new ObservableCollection<RegisterRow>(holdingRows);
+        CoilRows = new ObservableCollection<CoilRow>(coilRows);
     }
 
     private void AddHolding()
     {
         try
         {
+            if (IsBulkWorking)
+            {
+                StatusText = "Bulk add running.";
+                return;
+            }
+
             ModbusDataStore store = RequireStore();
             ushort address = ModbusAddress.Parse(HoldingAddressText, store.HoldingCount);
             ushort value = ParseUshortValue(HoldingValueText);
-            List<(ushort Address, ushort Value)> map = _holdingMaps[SelectedSlaveId!.Value];
-            if (map.Any(e => e.Address == address))
+            Dictionary<ushort, ushort> map = _holdingMaps[SelectedSlaveId!.Value];
+            if (map.ContainsKey(address))
             {
                 StatusText = $"Address {address} already in the map.";
                 return;
             }
 
             store.WriteHolding(address, value);
-            map.Add((address, value));
+            map[address] = value;
             StatusText = string.Empty;
             RefreshRows();
         }
@@ -411,13 +457,16 @@ public sealed class MainViewModel : ViewModelBase, IAsyncDisposable
     public void RemoveHoldings(IEnumerable<ushort> addresses)
     {
         ArgumentNullException.ThrowIfNull(addresses);
-        if (SelectedSlaveId is null || !_holdingMaps.TryGetValue(SelectedSlaveId.Value, out List<(ushort Address, ushort Value)>? map))
+        if (SelectedSlaveId is null || !_holdingMaps.TryGetValue(SelectedSlaveId.Value, out Dictionary<ushort, ushort>? map))
         {
             return;
         }
 
-        HashSet<ushort> doomed = [.. addresses];
-        map.RemoveAll(e => doomed.Contains(e.Address));
+        foreach (ushort address in addresses)
+        {
+            map.Remove(address);
+        }
+
         RefreshRows();
     }
 
@@ -425,13 +474,16 @@ public sealed class MainViewModel : ViewModelBase, IAsyncDisposable
     public void RemoveCoils(IEnumerable<ushort> addresses)
     {
         ArgumentNullException.ThrowIfNull(addresses);
-        if (SelectedSlaveId is null || !_coilMaps.TryGetValue(SelectedSlaveId.Value, out List<(ushort Address, bool IsOn)>? map))
+        if (SelectedSlaveId is null || !_coilMaps.TryGetValue(SelectedSlaveId.Value, out HashSet<ushort>? map))
         {
             return;
         }
 
-        HashSet<ushort> doomed = [.. addresses];
-        map.RemoveAll(e => doomed.Contains(e.Address));
+        foreach (ushort address in addresses)
+        {
+            map.Remove(address);
+        }
+
         RefreshRows();
     }
 
@@ -439,16 +491,21 @@ public sealed class MainViewModel : ViewModelBase, IAsyncDisposable
     {
         try
         {
+            if (IsBulkWorking)
+            {
+                StatusText = "Bulk add running.";
+                return;
+            }
+
             ModbusDataStore store = RequireStore();
             ushort address = ModbusAddress.Parse(CoilAddressText, store.CoilCount);
-            List<(ushort Address, bool IsOn)> map = _coilMaps[SelectedSlaveId!.Value];
-            if (map.Any(e => e.Address == address))
+            HashSet<ushort> map = _coilMaps[SelectedSlaveId!.Value];
+            if (!map.Add(address))
             {
                 StatusText = $"Address {address} already in the map.";
                 return;
             }
 
-            map.Add((address, false));
             StatusText = string.Empty;
             RefreshRows();
         }
@@ -458,13 +515,17 @@ public sealed class MainViewModel : ViewModelBase, IAsyncDisposable
         }
     }
 
-    private void AddHoldingRange()
+    private async Task AddHoldingRangeAsync(CancellationToken cancellationToken)
     {
+        ModbusDataStore store;
+        ushort start;
+        ushort end;
+        ushort value;
         try
         {
-            ModbusDataStore store = RequireStore();
-            ushort start = ModbusAddress.Parse(HoldingAddressText, store.HoldingCount);
-            ushort end = ModbusAddress.Parse(HoldingEndText, store.HoldingCount);
+            store = RequireStore();
+            start = ModbusAddress.Parse(HoldingAddressText, store.HoldingCount);
+            end = ModbusAddress.Parse(HoldingEndText, store.HoldingCount);
             if (end < start)
             {
                 StatusText = $"Invalid range: '{HoldingAddressText}-{HoldingEndText}'.";
@@ -477,40 +538,37 @@ public sealed class MainViewModel : ViewModelBase, IAsyncDisposable
                 return;
             }
 
-            ushort value = ParseUshortValue(HoldingValueText);
-            List<(ushort Address, ushort Value)> map = _holdingMaps[SelectedSlaveId!.Value];
-            int added = 0;
-            int skipped = 0;
-            for (int address = start; address <= end; address++)
-            {
-                ushort a = (ushort)address;
-                if (map.Any(e => e.Address == a))
-                {
-                    skipped++;
-                    continue;
-                }
-
-                store.WriteHolding(a, value);
-                map.Add((a, value));
-                added++;
-            }
-
-            StatusText = $"Added {added}, skipped {skipped}.";
-            RefreshRows();
+            value = ParseUshortValue(HoldingValueText);
         }
         catch (Exception ex)
         {
             StatusText = $"Error: {ex.Message}";
+            return;
         }
+
+        Dictionary<ushort, ushort> map = _holdingMaps[SelectedSlaveId!.Value];
+        await RunBulkAsync(start, end, a =>
+        {
+            if (!map.ContainsKey(a))
+            {
+                store.WriteHolding(a, value);
+                map[a] = value;
+            }
+        }, cancellationToken).ConfigureAwait(false);
+        StatusText = $"Added range {start}-{end}.";
+        RefreshRows();
     }
 
-    private void AddCoilRange()
+    private async Task AddCoilRangeAsync(CancellationToken cancellationToken)
     {
+        ModbusDataStore store;
+        ushort start;
+        ushort end;
         try
         {
-            ModbusDataStore store = RequireStore();
-            ushort start = ModbusAddress.Parse(CoilAddressText, store.CoilCount);
-            ushort end = ModbusAddress.Parse(CoilEndText, store.CoilCount);
+            store = RequireStore();
+            start = ModbusAddress.Parse(CoilAddressText, store.CoilCount);
+            end = ModbusAddress.Parse(CoilEndText, store.CoilCount);
             if (end < start)
             {
                 StatusText = $"Invalid range: '{CoilAddressText}-{CoilEndText}'.";
@@ -522,29 +580,46 @@ public sealed class MainViewModel : ViewModelBase, IAsyncDisposable
                 StatusText = $"Range too large (max {ModbusLimits.MaxBulkAdd}).";
                 return;
             }
-
-            List<(ushort Address, bool IsOn)> map = _coilMaps[SelectedSlaveId!.Value];
-            int added = 0;
-            int skipped = 0;
-            for (int address = start; address <= end; address++)
-            {
-                ushort a = (ushort)address;
-                if (map.Any(e => e.Address == a))
-                {
-                    skipped++;
-                    continue;
-                }
-
-                map.Add((a, false));
-                added++;
-            }
-
-            StatusText = $"Added {added}, skipped {skipped}.";
-            RefreshRows();
         }
         catch (Exception ex)
         {
             StatusText = $"Error: {ex.Message}";
+            return;
+        }
+
+        HashSet<ushort> map = _coilMaps[SelectedSlaveId!.Value];
+        await RunBulkAsync(start, end, a => map.Add(a), cancellationToken).ConfigureAwait(false);
+        StatusText = $"Added range {start}-{end}.";
+        RefreshRows();
+    }
+
+    private async Task RunBulkAsync(ushort start, ushort end, Action<ushort> work, CancellationToken ct)
+    {
+        IsBulkWorking = true;
+        BulkProgress = 0;
+        try
+        {
+            await Task.Run(() =>
+            {
+                for (int address = start; address <= end; address++)
+                {
+                    ct.ThrowIfCancellationRequested();
+                    work((ushort)address);
+                    if ((address - start) % 512 == 0)
+                    {
+                        BulkProgress = 100.0 * (address - start + 1) / (end - start + 1);
+                    }
+                }
+            }, ct).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            StatusText = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            IsBulkWorking = false;
+            BulkProgress = 0;
         }
     }
 
@@ -564,12 +639,12 @@ public sealed class MainViewModel : ViewModelBase, IAsyncDisposable
             }
 
             List<RegisterMapStore.HoldingMapItem> holdings = _holdingMaps[SelectedSlaveId.Value]
-                .OrderBy(e => e.Address)
-                .Select(e => new RegisterMapStore.HoldingMapItem(e.Address, store.ReadHolding(e.Address, 1)[0]))
+                .OrderBy(e => e.Key)
+                .Select(e => new RegisterMapStore.HoldingMapItem(e.Key, store.ReadHolding(e.Key, 1)[0]))
                 .ToList();
             List<RegisterMapStore.CoilMapItem> coils = _coilMaps[SelectedSlaveId.Value]
-                .OrderBy(e => e.Address)
-                .Select(e => new RegisterMapStore.CoilMapItem(e.Address, store.ReadCoils(e.Address, 1)[0]))
+                .OrderBy(a => a)
+                .Select(a => new RegisterMapStore.CoilMapItem(a, store.ReadCoils(a, 1)[0]))
                 .ToList();
             RegisterMapStore.Save(dialog.FileName, holdings, coils);
             StatusText = $"Saved to {dialog.FileName}.";
@@ -611,19 +686,20 @@ public sealed class MainViewModel : ViewModelBase, IAsyncDisposable
                 }
             }
 
-            List<(ushort Address, ushort Value)> holdings = file.Holding
+            Dictionary<ushort, ushort> holdings = file.Holding
                 .GroupBy(e => e.Address).Select(g => g.First())
-                .OrderBy(e => e.Address).Select(e => (e.Address, e.Value)).ToList();
-            List<(ushort Address, bool IsOn)> coils = file.Coils
+                .ToDictionary(e => e.Address, e => e.Value);
+            Dictionary<ushort, bool> coilValues = file.Coils
                 .GroupBy(e => e.Address).Select(g => g.First())
-                .OrderBy(e => e.Address).Select(e => (e.Address, e.IsOn)).ToList();
+                .ToDictionary(e => e.Address, e => e.IsOn);
+            HashSet<ushort> coils = [.. coilValues.Keys];
 
             foreach ((ushort address, ushort value) in holdings)
             {
                 store.WriteHolding(address, value);
             }
 
-            foreach ((ushort address, bool isOn) in coils)
+            foreach ((ushort address, bool isOn) in coilValues)
             {
                 store.WriteCoil(address, isOn);
             }

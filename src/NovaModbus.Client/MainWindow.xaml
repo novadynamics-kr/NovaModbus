@@ -195,6 +195,9 @@
                         <TextBox Width="80" VerticalAlignment="Center"
                                  Text="{Binding AutoIntervalMsText, UpdateSourceTrigger=PropertyChanged}"/>
                         <Label Content="ms"/>
+                        <ProgressBar Width="120" Height="14" VerticalAlignment="Center" Margin="8,0,0,0"
+                                     Minimum="0" Maximum="100"
+                                     Value="{Binding BulkProgress, Mode=OneWay}"/>
                         <TextBlock VerticalAlignment="Center" Margin="8,0,0,0"
                                    Text="{Binding StatusText}"/>
                     </StackPanel>
