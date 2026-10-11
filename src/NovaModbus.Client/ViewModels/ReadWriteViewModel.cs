@@ -266,7 +266,7 @@ public sealed class ReadWriteViewModel : ViewModelBase
     private static async Task<string> ReportServerIdAsync(ModbusRtuClient client, byte slaveId, CancellationToken ct)
     {
         (byte[] id, bool running) = await client.ReportServerIdAsync(slaveId, ct).ConfigureAwait(false);
-        return $"ID: {FormatIdBytes(id)}, Running: {running}";
+        return $"ID: {ValueFormatter.FormatDeviceId(id)}, Running: {running}";
     }
 
     private async Task<string> ReadFileRecordAsync(ModbusRtuClient client, byte slaveId, CancellationToken ct)
@@ -309,11 +309,6 @@ public sealed class ReadWriteViewModel : ViewModelBase
         ushort[] values = await client.ReadFifoQueueAsync(slaveId, pointer, ct).ConfigureAwait(false);
         return values.Length == 0 ? "(empty queue)" : ValueFormatter.FormatRegisters(values);
     }
-
-    private static string FormatIdBytes(byte[] id) =>
-        id.All(b => b is >= 0x20 and < 0x7F)
-            ? System.Text.Encoding.ASCII.GetString(id)
-            : Hex.Format(id);
 
     private void OnError(Exception ex) => ResultText = $"Error: {ex.Message}";
 

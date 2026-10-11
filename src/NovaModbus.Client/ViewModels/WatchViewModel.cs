@@ -34,6 +34,13 @@ public sealed class WatchViewModel : ViewModelBase, IDisposable
         WatchArea.InputRegisters,
         WatchArea.Coils,
         WatchArea.DiscreteInputs,
+        WatchArea.ExceptionStatus,
+        WatchArea.DiagnosticsCounter,
+        WatchArea.CommEventCounter,
+        WatchArea.CommEventLog,
+        WatchArea.ServerId,
+        WatchArea.FileRecord,
+        WatchArea.FifoQueue,
     ];
 
     /// <summary>Registered entries.</summary>
@@ -63,12 +70,21 @@ public sealed class WatchViewModel : ViewModelBase, IDisposable
         set => SetProperty(ref _startText, value);
     }
 
-    /// <summary>New-entry count text.</summary>
+    /// <summary>New-entry count text (record number for files).</summary>
     public string CountText
     {
         get => _countText;
         set => SetProperty(ref _countText, value);
     }
+
+    /// <summary>New-entry extra text (diagnostic data bytes, file length).</summary>
+    public string ExtraText
+    {
+        get => _extraText;
+        set => SetProperty(ref _extraText, value);
+    }
+
+    private string _extraText = string.Empty;
 
     /// <summary>Selected entry (enables Remove).</summary>
     public WatchEntry? SelectedEntry
@@ -225,6 +241,13 @@ public sealed class WatchViewModel : ViewModelBase, IDisposable
                     await client.ReadCoilsAsync(entry.SlaveId, entry.Start, entry.Count, ct).ConfigureAwait(false)),
                 WatchArea.DiscreteInputs => ValueFormatter.FormatBits(
                     await client.ReadDiscreteInputsAsync(entry.SlaveId, entry.Start, entry.Count, ct).ConfigureAwait(false)),
+                WatchArea.ExceptionStatus => await ReadWatchStatusAsync(client, entry, ct).ConfigureAwait(false),
+                WatchArea.DiagnosticsCounter => await ReadWatchDiagnosticsAsync(client, entry, ct).ConfigureAwait(false),
+                WatchArea.CommEventCounter => await ReadWatchEventCounterAsync(client, entry, ct).ConfigureAwait(false),
+                WatchArea.CommEventLog => await ReadWatchEventLogAsync(client, entry, ct).ConfigureAwait(false),
+                WatchArea.ServerId => await ReadWatchServerIdAsync(client, entry, ct).ConfigureAwait(false),
+                WatchArea.FileRecord => await ReadWatchFileAsync(client, entry, ct).ConfigureAwait(false),
+                WatchArea.FifoQueue => await ReadWatchFifoAsync(client, entry, ct).ConfigureAwait(false),
                 _ => throw new InvalidOperationException($"Unknown area {entry.Area}."),
             };
             row.Timestamp = DateTime.Now.ToString("HH:mm:ss.fff", null);
@@ -243,6 +266,84 @@ public sealed class WatchViewModel : ViewModelBase, IDisposable
             row.ValuesText = values;
             row.Status = status;
         }
+    }
+
+    private static async Task<string> ReadWatchStatusAsync(ModbusRtuClient client, WatchEntry entry, CancellationToken ct)
+    {
+        byte status = await client.ReadExceptionStatusAsync(entry.SlaveId, ct).ConfigureAwait(false);
+        return $"Status: 0x{status:X2} ({status})";
+    }
+
+    private static async Task<string> ReadWatchDiagnosticsAsync(ModbusRtuClient client, WatchEntry entry, CancellationToken ct)
+    {
+        byte[] data = ParseExtraBytes(entry.Extra);
+        byte[] echo = await client.DiagnosticsAsync(entry.SlaveId, entry.Start, data, ct).ConfigureAwait(false);
+        return $"Sub 0x{entry.Start:X4} echo: {Hex.Format(echo)}";
+    }
+
+    private static async Task<string> ReadWatchEventCounterAsync(ModbusRtuClient client, WatchEntry entry, CancellationToken ct)
+    {
+        (ushort status, ushort events) = await client.GetCommEventCounterAsync(entry.SlaveId, ct).ConfigureAwait(false);
+        return $"Status: 0x{status:X4}, Events: {events}";
+    }
+
+    private static async Task<string> ReadWatchEventLogAsync(ModbusRtuClient client, WatchEntry entry, CancellationToken ct)
+    {
+        (ushort status, ushort events, ushort messages, byte[] log) =
+            await client.GetCommEventLogAsync(entry.SlaveId, ct).ConfigureAwait(false);
+        return $"Status: 0x{status:X4}, Events: {events}, Messages: {messages}{Environment.NewLine}{Hex.Format(log)}";
+    }
+
+    private static async Task<string> ReadWatchServerIdAsync(ModbusRtuClient client, WatchEntry entry, CancellationToken ct)
+    {
+        (byte[] id, bool running) = await client.ReportServerIdAsync(entry.SlaveId, ct).ConfigureAwait(false);
+        return $"ID: {ValueFormatter.FormatDeviceId(id)}, Running: {running}";
+    }
+
+    private static async Task<string> ReadWatchFileAsync(ModbusRtuClient client, WatchEntry entry, CancellationToken ct)
+    {
+        ushort length = ParseExtraUshort(entry.Extra, "length");
+        FileSubRequest[] subs = [new(entry.Start, entry.Count, length)];
+        ushort[][] records = await client.ReadFileRecordAsync(entry.SlaveId, subs, ct).ConfigureAwait(false);
+        return ValueFormatter.FormatRegisters(records[0]);
+    }
+
+    private static async Task<string> ReadWatchFifoAsync(ModbusRtuClient client, WatchEntry entry, CancellationToken ct)
+    {
+        ushort[] values = await client.ReadFifoQueueAsync(entry.SlaveId, entry.Start, ct).ConfigureAwait(false);
+        return values.Length == 0 ? "(empty queue)" : ValueFormatter.FormatRegisters(values);
+    }
+
+    private static byte[] ParseExtraBytes(string extra)
+    {
+        string[] tokens = extra.Split([',', ' ', ';'], StringSplitOptions.RemoveEmptyEntries);
+        byte[] data = new byte[tokens.Length];
+        for (int i = 0; i < tokens.Length; i++)
+        {
+            string text = tokens[i].Trim();
+            try
+            {
+                data[i] = text.StartsWith("0x", StringComparison.OrdinalIgnoreCase)
+                    ? Convert.ToByte(text[2..], 16)
+                    : byte.Parse(text, null);
+            }
+            catch (Exception ex) when (ex is FormatException or OverflowException)
+            {
+                throw new ArgumentException($"Invalid byte '{tokens[i].Trim()}'.", ex);
+            }
+        }
+
+        return data;
+    }
+
+    private static ushort ParseExtraUshort(string extra, string name)
+    {
+        if (!ushort.TryParse(extra.Trim(), out ushort value) || value == 0)
+        {
+            throw new ArgumentException($"Invalid {name}: '{extra}'.");
+        }
+
+        return value;
     }
 
     private void OnError(Exception ex) => StatusText = $"Error: {ex.Message}";
@@ -323,7 +424,7 @@ public sealed class WatchViewModel : ViewModelBase, IDisposable
 
         if (!ushort.TryParse(StartText, out ushort start))
         {
-            throw new ArgumentException($"Invalid start address: '{StartText}'.");
+            throw new ArgumentException($"Invalid start: '{StartText}'.");
         }
 
         if (!ushort.TryParse(CountText, out ushort count) || count == 0)
@@ -331,14 +432,31 @@ public sealed class WatchViewModel : ViewModelBase, IDisposable
             throw new ArgumentException($"Invalid count: '{CountText}'.");
         }
 
-        int max = Area is WatchArea.Coils or WatchArea.DiscreteInputs
-            ? ModbusLimits.MaxReadBits
-            : ModbusLimits.MaxReadRegisters;
-        if (count > max)
+        if (Area is WatchArea.Coils or WatchArea.DiscreteInputs)
         {
-            throw new ArgumentException($"Count exceeds {Area} limit ({max}).");
+            if (count > ModbusLimits.MaxReadBits)
+            {
+                throw new ArgumentException($"Count exceeds {Area} limit ({ModbusLimits.MaxReadBits}).");
+            }
+        }
+        else if (Area is WatchArea.HoldingRegisters or WatchArea.InputRegisters)
+        {
+            if (count > ModbusLimits.MaxReadRegisters)
+            {
+                throw new ArgumentException($"Count exceeds {Area} limit ({ModbusLimits.MaxReadRegisters}).");
+            }
         }
 
-        return new WatchEntry(slaveId, Area, start, count);
+        if (Area == WatchArea.FileRecord)
+        {
+            _ = ParseExtraUshort(ExtraText, "length");
+        }
+
+        if (Area == WatchArea.DiagnosticsCounter)
+        {
+            _ = ParseExtraBytes(ExtraText);
+        }
+
+        return new WatchEntry(slaveId, Area, start, count, ExtraText.Trim());
     }
 }

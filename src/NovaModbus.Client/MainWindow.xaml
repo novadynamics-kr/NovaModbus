@@ -162,8 +162,12 @@
                             <TextBox Width="80" Text="{Binding StartText, UpdateSourceTrigger=PropertyChanged}"/>
                         </StackPanel>
                         <StackPanel Margin="0,0,8,0">
-                            <Label Content="Count"/>
+                            <Label Content="Count / Record"/>
                             <TextBox Width="80" Text="{Binding CountText, UpdateSourceTrigger=PropertyChanged}"/>
+                        </StackPanel>
+                        <StackPanel Margin="0,0,8,0">
+                            <Label Content="Extra (diag data / file len)"/>
+                            <TextBox Width="140" Text="{Binding ExtraText, UpdateSourceTrigger=PropertyChanged}"/>
                         </StackPanel>
                         <StackPanel Orientation="Horizontal" VerticalAlignment="Bottom">
                             <Button Content="Add" Padding="16,2" Margin="0,0,4,1"
@@ -193,6 +197,7 @@
                             <DataGridTextColumn Header="Area" Binding="{Binding Area}"/>
                             <DataGridTextColumn Header="Start" Binding="{Binding Start}"/>
                             <DataGridTextColumn Header="Count" Binding="{Binding Count}"/>
+                            <DataGridTextColumn Header="Extra" Binding="{Binding Extra}"/>
                         </DataGrid.Columns>
                     </DataGrid>
 

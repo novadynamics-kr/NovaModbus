@@ -1,3 +1,5 @@
+using NovaModbus.Rtu;
+
 namespace NovaModbus.Client.Services;
 
 /// <summary>Shared value formatting for read results.</summary>
@@ -15,5 +17,14 @@ public static class ValueFormatter
     {
         ArgumentNullException.ThrowIfNull(values);
         return string.Join(Environment.NewLine, values.Select((v, i) => $"[{i}] 0x{v:X4} ({v})"));
+    }
+
+    /// <summary>Device ID bytes as ASCII text, or hex when not printable.</summary>
+    public static string FormatDeviceId(byte[] id)
+    {
+        ArgumentNullException.ThrowIfNull(id);
+        return id.All(b => b is >= 0x20 and < 0x7F)
+            ? System.Text.Encoding.ASCII.GetString(id)
+            : Hex.Format(id);
     }
 }
