@@ -11,6 +11,7 @@ public sealed class FakeSerialTransport : ISerialTransport
     private readonly SemaphoreSlim _signal = new(0);
     private FakeSerialTransport? _peer;
     private bool _isOpen = true;
+    private bool _disposed;
 
     /// <summary>Creates two linked transports (writes on one arrive on the other).</summary>
     public static (FakeSerialTransport Left, FakeSerialTransport Right) CreatePair()
@@ -136,6 +137,12 @@ public sealed class FakeSerialTransport : ISerialTransport
     /// <inheritdoc />
     public ValueTask DisposeAsync()
     {
+        if (_disposed)
+        {
+            return ValueTask.CompletedTask;
+        }
+
+        _disposed = true;
         _isOpen = false;
         _signal.Dispose();
         GC.SuppressFinalize(this);
