@@ -173,7 +173,7 @@
                             <Button Content="Add" Padding="16,2" Margin="0,0,4,1"
                                     Command="{Binding AddCommand}"/>
                             <Button Content="Del" Padding="16,2" Margin="0,0,4,1"
-                                    Command="{Binding RemoveSelectedCommand}"/>
+                                    Click="OnWatchDelete"/>
                             <Button Content="Save" Padding="16,2" Margin="0,0,4,1"
                                     Command="{Binding SaveWatchCommand}"/>
                             <Button Content="Load" Padding="16,2" Margin="0,0,0,1"
@@ -196,7 +196,7 @@
                     <DataGrid Grid.Row="2" Margin="0,8,0,0" Name="WatchGrid"
                               AutoGenerateColumns="False"
                               IsReadOnly="True" ItemsSource="{Binding Entries}"
-                              SelectedItem="{Binding SelectedWatchEntry}"
+                              SelectionMode="Extended"
                               KeyDown="OnWatchDeleteKey">
                         <DataGrid.Columns>
                             <DataGridTextColumn Header="Slave" Binding="{Binding SlaveId}"/>

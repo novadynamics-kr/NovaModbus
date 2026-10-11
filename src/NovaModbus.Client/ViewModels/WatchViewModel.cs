@@ -22,7 +22,6 @@ public sealed class WatchViewModel : ViewModelBase, IDisposable
         ArgumentNullException.ThrowIfNull(clientProvider);
         _clientProvider = clientProvider;
         AddCommand = new RelayCommand(AddEntry);
-        RemoveSelectedCommand = new RelayCommand(RemoveSelected, () => SelectedWatchEntry is not null);
         ReadAllCommand = new AsyncRelayCommand(ReadAllAsync, () => !IsBusy, OnError);
         SaveWatchCommand = new RelayCommand(SaveWatch);
         LoadWatchCommand = new RelayCommand(LoadWatch);
@@ -87,26 +86,8 @@ public sealed class WatchViewModel : ViewModelBase, IDisposable
 
     private string _extraText = string.Empty;
 
-    /// <summary>Selected entry (enables Remove).</summary>
-    public WatchEntry? SelectedWatchEntry
-    {
-        get => _selectedWatchEntry;
-        set
-        {
-            if (SetProperty(ref _selectedWatchEntry, value))
-            {
-                RemoveSelectedCommand.RaiseCanExecuteChanged();
-            }
-        }
-    }
-
-    private WatchEntry? _selectedWatchEntry;
-
     /// <summary>Add the configured entry.</summary>
     public RelayCommand AddCommand { get; }
-
-    /// <summary>Remove the selected entry and its result row.</summary>
-    public RelayCommand RemoveSelectedCommand { get; }
 
     /// <summary>Save the watch list to a JSON file.</summary>
     public RelayCommand SaveWatchCommand { get; }
@@ -189,21 +170,25 @@ public sealed class WatchViewModel : ViewModelBase, IDisposable
         }
     }
 
-    private void RemoveSelected()
+    /// <summary>Remove entries and their result rows (multi-select).</summary>
+    public void RemoveEntries(IEnumerable<WatchEntry> entries)
     {
-        if (SelectedWatchEntry is null)
+        ArgumentNullException.ThrowIfNull(entries);
+        HashSet<WatchEntry> doomed = [.. entries];
+        if (doomed.Count == 0)
         {
             return;
         }
 
-        WatchResult? row = Results.FirstOrDefault(r => r.Entry == SelectedWatchEntry);
-        if (row is not null)
+        foreach (WatchResult row in Results.Where(r => doomed.Contains(r.Entry)).ToArray())
         {
             Results.Remove(row);
         }
 
-        Entries.Remove(SelectedWatchEntry);
-        SelectedWatchEntry = null;
+        foreach (WatchEntry entry in Entries.Where(doomed.Contains).ToArray())
+        {
+            Entries.Remove(entry);
+        }
     }
 
     private void SaveWatch()
@@ -245,7 +230,6 @@ public sealed class WatchViewModel : ViewModelBase, IDisposable
             WatchEntry[] loaded = WatchListStore.Load(dialog.FileName);
             Entries.Clear();
             Results.Clear();
-            SelectedWatchEntry = null;
             foreach (WatchEntry entry in loaded)
             {
                 Entries.Add(entry);

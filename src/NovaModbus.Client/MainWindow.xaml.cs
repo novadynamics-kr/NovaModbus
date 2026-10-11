@@ -30,9 +30,14 @@ public partial class MainWindow : Window
             return;
         }
 
-        if (DataContext is MainViewModel vm && vm.Watch.SelectedWatchEntry is not null)
+        OnWatchDelete(sender, e);
+    }
+
+    private void OnWatchDelete(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is MainViewModel vm)
         {
-            vm.Watch.RemoveSelectedCommand.Execute(null);
+            vm.Watch.RemoveEntries(WatchGrid.SelectedItems.OfType<WatchEntry>());
             e.Handled = true;
         }
     }
