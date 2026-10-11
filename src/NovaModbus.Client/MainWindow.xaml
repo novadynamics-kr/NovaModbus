@@ -162,6 +162,10 @@
                             <TextBox Width="80" Text="{Binding StartText, UpdateSourceTrigger=PropertyChanged}"/>
                         </StackPanel>
                         <StackPanel Margin="0,0,8,0">
+                            <Label Content="End (range)"/>
+                            <TextBox Width="80" Text="{Binding AddressEndText, UpdateSourceTrigger=PropertyChanged}"/>
+                        </StackPanel>
+                        <StackPanel Margin="0,0,8,0">
                             <Label Content="Count / Record"/>
                             <TextBox Width="80" Text="{Binding CountText, UpdateSourceTrigger=PropertyChanged}"/>
                         </StackPanel>
