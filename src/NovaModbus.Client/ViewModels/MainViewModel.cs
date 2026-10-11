@@ -11,9 +11,10 @@ public sealed class MainViewModel : ViewModelBase, IAsyncDisposable
     public const string TestSlaveEndpoint = "nova-test-slave";
 
     private readonly VirtualSerialBus _bus = VirtualSerialBus.Shared;
-    private readonly CancellationTokenSource _lifetime = new();
-    private readonly SlaveServer _testSlaveServer;
+    private CancellationTokenSource? _slaveCts;
+    private VirtualTransport? _slaveHeldTransport;
     private string _statusText = "Disconnected";
+    private bool _testSlaveEnabled = true;
     private bool _disposed;
 
     /// <summary>Initializes settings, connection, and the embedded test slave.</summary>
@@ -25,16 +26,29 @@ public sealed class MainViewModel : ViewModelBase, IAsyncDisposable
         Polling = new PollingViewModel(ReadWrite);
         Connection.ConnectionChanged += OnConnectionChanged;
 
-        var (held, published) = VirtualTransport.CreatePair();
-        _bus.Publish(TestSlaveEndpoint, published);
-        ModbusRtuSlave slave = new(held);
-        slave.Engine.AddSlave(1);
-        _testSlaveServer = new SlaveServer(slave);
-        _ = _testSlaveServer.RunAsync(_lifetime.Token);
-
-        SerialSettings.RefreshPorts();
+        StartTestSlave();
         ConnectCommand = new AsyncRelayCommand(ConnectAsync, () => !Connection.IsConnected, OnError);
         DisconnectCommand = new AsyncRelayCommand(DisconnectAsync, () => Connection.IsConnected, OnError);
+    }
+
+    /// <summary>Whether the embedded test slave runs (publishes its endpoint).</summary>
+    public bool TestSlaveEnabled
+    {
+        get => _testSlaveEnabled;
+        set
+        {
+            if (SetProperty(ref _testSlaveEnabled, value))
+            {
+                if (value)
+                {
+                    StartTestSlave();
+                }
+                else
+                {
+                    StopTestSlave();
+                }
+            }
+        }
     }
 
     /// <summary>Serial port settings (left panel).</summary>
@@ -67,6 +81,43 @@ public sealed class MainViewModel : ViewModelBase, IAsyncDisposable
 
     /// <summary>Close the current transport.</summary>
     public AsyncRelayCommand DisconnectCommand { get; }
+
+    private void StartTestSlave()
+    {
+        StopTestSlave();
+        _slaveCts = new CancellationTokenSource();
+        var (held, published) = VirtualTransport.CreatePair();
+        _slaveHeldTransport = held;
+        _bus.Publish(TestSlaveEndpoint, published);
+        ModbusRtuSlave slave = new(held);
+        slave.Engine.AddSlave(1);
+        _ = new SlaveServer(slave).RunAsync(_slaveCts.Token);
+        SerialSettings.RefreshPorts();
+    }
+
+    private void StopTestSlave()
+    {
+        try
+        {
+            _slaveCts?.Cancel();
+        }
+        catch (ObjectDisposedException)
+        {
+            // Already torn down.
+        }
+
+        _slaveCts?.Dispose();
+        _slaveCts = null;
+        _bus.Unpublish(TestSlaveEndpoint);
+        if (_slaveHeldTransport is not null)
+        {
+            // VirtualTransport disposal is fully synchronous (no awaits inside).
+            _slaveHeldTransport.DisposeAsync().AsTask().GetAwaiter().GetResult();
+            _slaveHeldTransport = null;
+        }
+
+        SerialSettings.RefreshPorts();
+    }
 
     private async Task ConnectAsync(CancellationToken cancellationToken)
     {
@@ -115,10 +166,9 @@ public sealed class MainViewModel : ViewModelBase, IAsyncDisposable
 
         _disposed = true;
         Polling.Dispose();
+        StopTestSlave();
         await Connection.DisposeAsync().ConfigureAwait(false);
-        await _lifetime.CancelAsync().ConfigureAwait(false);
         _bus.Unpublish(TestSlaveEndpoint);
-        _lifetime.Dispose();
         GC.SuppressFinalize(this);
     }
 }
