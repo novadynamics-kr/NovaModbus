@@ -119,11 +119,14 @@ Rules:
 
 ## 7. Branch / Commit / Merge Rules
 
-- Base is latest `main`. One task = one branch (`task/<issue>-<slug>`).
-  Trivial hotfixes may commit directly on `main`; everything else uses a
-  task branch. Integrate by direct fast-forward merge after approval —
-  PR creation is optional (milestone review only), never required.
-- One step = one commit: code + its step report + order update together.
+- Base is latest `main`. One task = one **local-only** branch
+  (`task/<issue>-<slug>`). Task branches are never pushed: no remote
+  branches, no PRs. Trivial hotfixes may commit directly on `main`.
+- One step = one local commit: code + its step report + order update.
+  Steps are not pushed individually.
+- Task end (after approval): merge the task branch into local `main`,
+  run the pre-merge gate, then publish with `git push nova main` directly.
+  Delete the local task branch after a successful push.
 - `git status` check before every merge/push. Never revert or delete
   changes the director made by hand without asking.
 - Before closing an issue, confirm the fix commits are actually in `main`.
@@ -131,7 +134,41 @@ Rules:
   `dotnet build NovaModbus.slnx -c Release` then
   `dotnet test NovaModbus.slnx -c Release`.
 
-## 8. Task Start Checklist (new session)
+## 8. Remote Sync (git over gh auth + gh)
+
+File transfer is git's job; API work (issues/PRs) is gh's job. Both
+authenticate through the single `gh auth login` (git side uses the
+credential helper it configures — verify once with
+`git config credential.helper`; if empty, run `gh auth setup-git`).
+The canonical remote name in this repo is **`nova`**, not `origin`.
+
+```powershell
+git fetch nova     # remote state refresh (read-only)
+git pull nova main # update local main (task start)
+git push nova main # publish (task end only — main only, never a task branch)
+```
+
+Cycle placement:
+
+1. Task start: `git fetch nova` → `main` 최신 확인 후 로컬 task 브랜치 생성.
+   Task 브랜치는 절대 push하지 않는다.
+2. Step approval: 로컬 commit only (push 없음).
+3. Task end (after merge approval): `main`으로 전환 → merge →
+   pre-merge gate → `git push nova main` → 로컬 task 브랜치 삭제
+   (`git branch -d`).
+4. `gh repo sync` may be used as a shortcut for step 1 refresh, but
+   always confirm with `git status --short --branch` afterwards.
+
+Never name a task branch in a push (that creates a remote branch).
+If one slips through, remove it with
+`git push nova --delete <branch>` and unset the local upstream
+(`git branch --unset-upstream`).
+
+`gh` never pushes files and git never touches issues — mixing them up
+(e.g. expecting `gh` to upload commits) is the common mistake this
+section exists to prevent.
+
+## 9. Task Start Checklist (new session)
 
 ```text
 1. docs/orders/<today>.md — what is on the plate, what state?

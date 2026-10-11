@@ -113,10 +113,10 @@ Logging/ — IModbusLogger (Action<string> 기반, 외부 로거 의존 없음)
   최종 보고 → 승인 후 merge·close. 1단계 = 1커밋(코드+문서 함께).
 - **품질 관문**: 계획 승인 → `build` 무경고 → `test` 전체 통과 →
   Modbus 스펙 벡터 대조 → 회귀 없음(기존 테스트 전부 녹색, 기준 완화 금지).
-- **GitHub는 로컬 `gh` CLI로만**: 단계 승인이 task 브랜치 push까지 포함.
-  main merge·PR(선택)·close는 별도 승인. 작업 브랜치는 최신 `main` 기준
-  `task/<issue>-<slug>`, 승인 후 main에 직접 merge (PR 불필요, hotfix는
-  main 직접 커밋 허용). `gh auth login` 선행 필요.
+- **GitHub 접근**: API 작업(이슈)은 로컬 `gh` CLI, 파일 송수신은
+  gh 인증 기반 git (`nova` 리모트). task 브랜치는 로컬 전용
+  (원격 브랜치·PR 없음). 단계 승인은 로컬 커밋까지, merge·close는 별도 승인.
+  승인 후 main에 merge → gate → `git push nova main` 직접 반영.
   상세 절차·템플릿은 `rules/docs-and-git-workflow.md`.
 - 바이브 코딩 전락 조건: 계획 없는 구현, 미검증 수락, "좋은 것 같습니다" 승인.
 
