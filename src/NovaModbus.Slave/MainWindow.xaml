@@ -109,7 +109,7 @@
                             <TextBox Width="80" Text="{Binding HoldingAddressText, UpdateSourceTrigger=PropertyChanged}"/>
                         </StackPanel>
                         <StackPanel Margin="0,0,8,0">
-                            <Label Content="End (range)"/>
+                            <Label Content="End (dec/0x)"/>
                             <TextBox Width="80" Text="{Binding HoldingEndText, UpdateSourceTrigger=PropertyChanged}"/>
                         </StackPanel>
                         <StackPanel Margin="0,0,8,0">
@@ -156,7 +156,7 @@
                             <TextBox Width="80" Text="{Binding CoilAddressText, UpdateSourceTrigger=PropertyChanged}"/>
                         </StackPanel>
                         <StackPanel Margin="0,0,8,0">
-                            <Label Content="End (range)"/>
+                            <Label Content="End (dec/0x)"/>
                             <TextBox Width="80" Text="{Binding CoilEndText, UpdateSourceTrigger=PropertyChanged}"/>
                         </StackPanel>
                         <StackPanel Orientation="Horizontal" VerticalAlignment="Bottom">

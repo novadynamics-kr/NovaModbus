@@ -576,16 +576,13 @@ public sealed class WatchViewModel : ViewModelBase, IDisposable
 
     private static ushort ParseUshortHex(string text, string name)
     {
-        string trimmed = text.Trim();
         try
         {
-            return trimmed.StartsWith("0x", StringComparison.OrdinalIgnoreCase)
-                ? Convert.ToUInt16(trimmed[2..], 16)
-                : ushort.Parse(trimmed, null);
+            return ModbusAddress.Parse(text);
         }
-        catch (Exception ex) when (ex is FormatException or OverflowException)
+        catch (ArgumentException)
         {
-            throw new ArgumentException($"Invalid {name}: '{text}'.", ex);
+            throw new ArgumentException($"Invalid {name}: '{text}'.");
         }
     }
 

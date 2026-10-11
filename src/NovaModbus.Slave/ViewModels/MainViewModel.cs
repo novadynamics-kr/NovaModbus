@@ -387,7 +387,7 @@ public sealed class MainViewModel : ViewModelBase, IAsyncDisposable
         try
         {
             ModbusDataStore store = RequireStore();
-            ushort address = ParseHexAddress(HoldingAddressText, store.HoldingCount);
+            ushort address = ModbusAddress.Parse(HoldingAddressText, store.HoldingCount);
             ushort value = ParseUshortValue(HoldingValueText);
             List<(ushort Address, ushort Value)> map = _holdingMaps[SelectedSlaveId!.Value];
             if (map.Any(e => e.Address == address))
@@ -440,7 +440,7 @@ public sealed class MainViewModel : ViewModelBase, IAsyncDisposable
         try
         {
             ModbusDataStore store = RequireStore();
-            ushort address = ParseHexAddress(CoilAddressText, store.CoilCount);
+            ushort address = ModbusAddress.Parse(CoilAddressText, store.CoilCount);
             List<(ushort Address, bool IsOn)> map = _coilMaps[SelectedSlaveId!.Value];
             if (map.Any(e => e.Address == address))
             {
@@ -463,8 +463,8 @@ public sealed class MainViewModel : ViewModelBase, IAsyncDisposable
         try
         {
             ModbusDataStore store = RequireStore();
-            ushort start = ParseMapAddress(HoldingAddressText, store.HoldingCount);
-            ushort end = ParseMapAddress(HoldingEndText, store.HoldingCount);
+            ushort start = ModbusAddress.Parse(HoldingAddressText, store.HoldingCount);
+            ushort end = ModbusAddress.Parse(HoldingEndText, store.HoldingCount);
             if (end < start)
             {
                 StatusText = $"Invalid range: '{HoldingAddressText}-{HoldingEndText}'.";
@@ -509,8 +509,8 @@ public sealed class MainViewModel : ViewModelBase, IAsyncDisposable
         try
         {
             ModbusDataStore store = RequireStore();
-            ushort start = ParseMapAddress(CoilAddressText, store.CoilCount);
-            ushort end = ParseMapAddress(CoilEndText, store.CoilCount);
+            ushort start = ModbusAddress.Parse(CoilAddressText, store.CoilCount);
+            ushort end = ModbusAddress.Parse(CoilEndText, store.CoilCount);
             if (end < start)
             {
                 StatusText = $"Invalid range: '{CoilAddressText}-{CoilEndText}'.";
@@ -546,35 +546,6 @@ public sealed class MainViewModel : ViewModelBase, IAsyncDisposable
         {
             StatusText = $"Error: {ex.Message}";
         }
-    }
-
-    private static ushort ParseMapAddress(string text, int capacity)
-    {
-        ushort address = ParseHexAddress(text, capacity);
-        return address;
-    }
-
-    private static ushort ParseHexAddress(string text, int capacity)
-    {
-        string trimmed = text.Trim();
-        ushort address;
-        try
-        {
-            address = trimmed.StartsWith("0x", StringComparison.OrdinalIgnoreCase)
-                ? Convert.ToUInt16(trimmed[2..], 16)
-                : ushort.Parse(trimmed, null);
-        }
-        catch (Exception ex) when (ex is FormatException or OverflowException)
-        {
-            throw new ArgumentException($"Invalid address: '{text}'.", ex);
-        }
-
-        if (address >= capacity)
-        {
-            throw new ArgumentException($"Address out of range: '{text}'.");
-        }
-
-        return address;
     }
 
     private void SaveMap()
@@ -723,7 +694,7 @@ public sealed class MainViewModel : ViewModelBase, IAsyncDisposable
         ushort address;
         try
         {
-            address = ParseHexAddress(FloatAddressText, ushort.MaxValue + 1);
+            address = ModbusAddress.Parse(FloatAddressText, ushort.MaxValue + 1);
         }
         catch (ArgumentException)
         {
