@@ -158,7 +158,7 @@
                                       SelectedItem="{Binding Area}"/>
                         </StackPanel>
                         <StackPanel Margin="0,0,8,0">
-                            <Label Content="Start"/>
+                            <Label Content="Address (dec/0x)"/>
                             <TextBox Width="80" Text="{Binding StartText, UpdateSourceTrigger=PropertyChanged}"/>
                         </StackPanel>
                         <StackPanel Margin="0,0,8,0">
@@ -172,6 +172,8 @@
                         <StackPanel Orientation="Horizontal" VerticalAlignment="Bottom">
                             <Button Content="Add" Padding="16,2" Margin="0,0,4,1"
                                     Command="{Binding AddCommand}"/>
+                            <Button Content="Add Range" Padding="16,2" Margin="0,0,4,1"
+                                    Command="{Binding AddRangeCommand}"/>
                             <Button Content="Del" Padding="16,2" Margin="0,0,4,1"
                                     Click="OnWatchDelete"/>
                             <Button Content="Save" Padding="16,2" Margin="0,0,4,1"

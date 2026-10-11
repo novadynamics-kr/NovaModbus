@@ -14,6 +14,7 @@ public sealed class WatchViewModel : ViewModelBase, IDisposable
     private string _slaveIdText = "1";
     private WatchArea _area = WatchArea.HoldingRegisters;
     private string _startText = "0";
+    private string _addressEndText = "9";
     private string _countText = "1";
 
     /// <summary>Initializes with a live client provider (null when disconnected).</summary>
@@ -22,6 +23,7 @@ public sealed class WatchViewModel : ViewModelBase, IDisposable
         ArgumentNullException.ThrowIfNull(clientProvider);
         _clientProvider = clientProvider;
         AddCommand = new RelayCommand(AddEntry);
+        AddRangeCommand = new RelayCommand(AddRange);
         ReadAllCommand = new AsyncRelayCommand(ReadAllAsync, () => !IsBusy, OnError);
         SaveWatchCommand = new RelayCommand(SaveWatch);
         LoadWatchCommand = new RelayCommand(LoadWatch);
@@ -63,11 +65,18 @@ public sealed class WatchViewModel : ViewModelBase, IDisposable
         set => SetProperty(ref _area, value);
     }
 
-    /// <summary>New-entry start address text.</summary>
+    /// <summary>New-entry start address text (decimal or 0x hex).</summary>
     public string StartText
     {
         get => _startText;
         set => SetProperty(ref _startText, value);
+    }
+
+    /// <summary>Bulk-add end address text (decimal or 0x hex).</summary>
+    public string AddressEndText
+    {
+        get => _addressEndText;
+        set => SetProperty(ref _addressEndText, value);
     }
 
     /// <summary>New-entry count text (record number for files).</summary>
@@ -88,6 +97,9 @@ public sealed class WatchViewModel : ViewModelBase, IDisposable
 
     /// <summary>Add the configured entry.</summary>
     public RelayCommand AddCommand { get; }
+
+    /// <summary>Add entries for the address range.</summary>
+    public RelayCommand AddRangeCommand { get; }
 
     /// <summary>Save the watch list to a JSON file.</summary>
     public RelayCommand SaveWatchCommand { get; }
@@ -481,21 +493,98 @@ public sealed class WatchViewModel : ViewModelBase, IDisposable
 
     private WatchEntry ParseEntry()
     {
+        byte slaveId = ParseSlaveId();
+        ushort start = ParseUshortHex(StartText, "address");
+        ushort count = ParseCount();
+        ValidateEntryLimits(count);
+        ValidateExtra();
+        return new WatchEntry(slaveId, Area, start, count, ExtraText.Trim());
+    }
+
+    private void AddRange()
+    {
+        try
+        {
+            byte slaveId = ParseSlaveId();
+            ushort start = ParseUshortHex(StartText, "address");
+            ushort end = ParseUshortHex(AddressEndText, "end address");
+            if (end < start)
+            {
+                StatusText = $"Invalid range: '{StartText}-{AddressEndText}'.";
+                return;
+            }
+
+            if (end - start + 1 > 1000)
+            {
+                StatusText = "Range too large (max 1000).";
+                return;
+            }
+
+            ushort count = ParseCount();
+            ValidateEntryLimits(count);
+            ValidateExtra();
+            string extra = ExtraText.Trim();
+            int added = 0;
+            int skipped = 0;
+            for (int address = start; address <= end; address++)
+            {
+                WatchEntry entry = new(slaveId, Area, (ushort)address, count, extra);
+                if (Entries.Contains(entry))
+                {
+                    skipped++;
+                    continue;
+                }
+
+                Entries.Add(entry);
+                Results.Add(new WatchResult(entry));
+                added++;
+            }
+
+            StatusText = $"Added {added}, skipped {skipped}.";
+        }
+        catch (Exception ex)
+        {
+            StatusText = $"Error: {ex.Message}";
+        }
+    }
+
+    private byte ParseSlaveId()
+    {
         if (!byte.TryParse(SlaveIdText, out byte slaveId) || slaveId is 0 or > 247)
         {
             throw new ArgumentException($"Invalid slave ID: '{SlaveIdText}' (1-247).");
         }
 
-        if (!ushort.TryParse(StartText, out ushort start))
-        {
-            throw new ArgumentException($"Invalid start: '{StartText}'.");
-        }
+        return slaveId;
+    }
 
+    private ushort ParseCount()
+    {
         if (!ushort.TryParse(CountText, out ushort count) || count == 0)
         {
             throw new ArgumentException($"Invalid count: '{CountText}'.");
         }
 
+        return count;
+    }
+
+    private static ushort ParseUshortHex(string text, string name)
+    {
+        string trimmed = text.Trim();
+        try
+        {
+            return trimmed.StartsWith("0x", StringComparison.OrdinalIgnoreCase)
+                ? Convert.ToUInt16(trimmed[2..], 16)
+                : ushort.Parse(trimmed, null);
+        }
+        catch (Exception ex) when (ex is FormatException or OverflowException)
+        {
+            throw new ArgumentException($"Invalid {name}: '{text}'.", ex);
+        }
+    }
+
+    private void ValidateEntryLimits(ushort count)
+    {
         if (Area is WatchArea.Coils or WatchArea.DiscreteInputs)
         {
             if (count > ModbusLimits.MaxReadBits)
@@ -510,7 +599,10 @@ public sealed class WatchViewModel : ViewModelBase, IDisposable
                 throw new ArgumentException($"Count exceeds {Area} limit ({ModbusLimits.MaxReadRegisters}).");
             }
         }
+    }
 
+    private void ValidateExtra()
+    {
         if (Area == WatchArea.FileRecord)
         {
             _ = ParseExtraUshort(ExtraText, "length");
@@ -520,7 +612,5 @@ public sealed class WatchViewModel : ViewModelBase, IDisposable
         {
             _ = ParseExtraBytes(ExtraText);
         }
-
-        return new WatchEntry(slaveId, Area, start, count, ExtraText.Trim());
     }
 }
