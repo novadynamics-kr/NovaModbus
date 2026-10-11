@@ -172,8 +172,12 @@
                         <StackPanel Orientation="Horizontal" VerticalAlignment="Bottom">
                             <Button Content="Add" Padding="16,2" Margin="0,0,4,1"
                                     Command="{Binding AddCommand}"/>
-                            <Button Content="Remove" Padding="16,2" Margin="0,0,0,1"
+                            <Button Content="Del" Padding="16,2" Margin="0,0,4,1"
                                     Command="{Binding RemoveSelectedCommand}"/>
+                            <Button Content="Save" Padding="16,2" Margin="0,0,4,1"
+                                    Command="{Binding SaveWatchCommand}"/>
+                            <Button Content="Load" Padding="16,2" Margin="0,0,0,1"
+                                    Command="{Binding LoadWatchCommand}"/>
                         </StackPanel>
                     </StackPanel>
 
@@ -189,13 +193,16 @@
                                    Text="{Binding StatusText}"/>
                     </StackPanel>
 
-                    <DataGrid Grid.Row="2" Margin="0,8,0,0" AutoGenerateColumns="False"
+                    <DataGrid Grid.Row="2" Margin="0,8,0,0" Name="WatchGrid"
+                              AutoGenerateColumns="False"
                               IsReadOnly="True" ItemsSource="{Binding Entries}"
-                              SelectedItem="{Binding SelectedEntry}">
+                              SelectedItem="{Binding SelectedWatchEntry}"
+                              KeyDown="OnWatchDeleteKey">
                         <DataGrid.Columns>
                             <DataGridTextColumn Header="Slave" Binding="{Binding SlaveId}"/>
                             <DataGridTextColumn Header="Area" Binding="{Binding Area}"/>
-                            <DataGridTextColumn Header="Start" Binding="{Binding Start}"/>
+                            <DataGridTextColumn Header="Address" Binding="{Binding Start}"/>
+                            <DataGridTextColumn Header="AddressHex" Binding="{Binding AddressHex}"/>
                             <DataGridTextColumn Header="Count" Binding="{Binding Count}"/>
                             <DataGridTextColumn Header="Extra" Binding="{Binding Extra}"/>
                         </DataGrid.Columns>
@@ -206,8 +213,16 @@
                         <DataGrid.Columns>
                             <DataGridTextColumn Header="Slave" Binding="{Binding Entry.SlaveId}"/>
                             <DataGridTextColumn Header="Area" Binding="{Binding Entry.Area}"/>
-                            <DataGridTextColumn Header="Start" Binding="{Binding Entry.Start}"/>
-                            <DataGridTextColumn Header="Values" Binding="{Binding ValuesText}" Width="*">
+                            <DataGridTextColumn Header="Address" Binding="{Binding Entry.Start}"/>
+                            <DataGridTextColumn Header="Dec" Binding="{Binding ValueDecText}">
+                                <DataGridTextColumn.ElementStyle>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="TextWrapping" Value="Wrap"/>
+                                        <Setter Property="FontFamily" Value="Consolas"/>
+                                    </Style>
+                                </DataGridTextColumn.ElementStyle>
+                            </DataGridTextColumn>
+                            <DataGridTextColumn Header="Hex" Binding="{Binding ValueHexText}" Width="*">
                                 <DataGridTextColumn.ElementStyle>
                                     <Style TargetType="TextBlock">
                                         <Setter Property="TextWrapping" Value="Wrap"/>

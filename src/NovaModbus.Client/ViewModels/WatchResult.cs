@@ -3,7 +3,8 @@ namespace NovaModbus.Client.ViewModels;
 /// <summary>Display row for one <see cref="WatchEntry"/>.</summary>
 public sealed class WatchResult : ViewModelBase
 {
-    private string _valuesText = "-";
+    private string _valueDecText = "-";
+    private string _valueHexText = "—";
     private string _timestamp = "-";
     private string _status = "Pending";
 
@@ -17,11 +18,18 @@ public sealed class WatchResult : ViewModelBase
     /// <summary>Watched address range.</summary>
     public WatchEntry Entry { get; }
 
-    /// <summary>Formatted values.</summary>
-    public string ValuesText
+    /// <summary>Decimal values.</summary>
+    public string ValueDecText
     {
-        get => _valuesText;
-        set => SetProperty(ref _valuesText, value);
+        get => _valueDecText;
+        set => SetProperty(ref _valueDecText, value);
+    }
+
+    /// <summary>Hex values.</summary>
+    public string ValueHexText
+    {
+        get => _valueHexText;
+        set => SetProperty(ref _valueHexText, value);
     }
 
     /// <summary>Last read time.</summary>

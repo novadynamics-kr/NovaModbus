@@ -1,4 +1,5 @@
 ﻿using System.Windows;
+using System.Windows.Input;
 using NovaModbus.Client.ViewModels;
 
 namespace NovaModbus.Client;
@@ -19,6 +20,20 @@ public partial class MainWindow : Window
         if (DataContext is IAsyncDisposable disposable)
         {
             await disposable.DisposeAsync().ConfigureAwait(true);
+        }
+    }
+
+    private void OnWatchDeleteKey(object sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Delete)
+        {
+            return;
+        }
+
+        if (DataContext is MainViewModel vm && vm.Watch.SelectedWatchEntry is not null)
+        {
+            vm.Watch.RemoveSelectedCommand.Execute(null);
+            e.Handled = true;
         }
     }
 }

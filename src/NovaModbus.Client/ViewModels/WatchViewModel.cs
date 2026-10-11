@@ -15,7 +15,6 @@ public sealed class WatchViewModel : ViewModelBase, IDisposable
     private WatchArea _area = WatchArea.HoldingRegisters;
     private string _startText = "0";
     private string _countText = "1";
-    private WatchEntry? _selectedEntry;
 
     /// <summary>Initializes with a live client provider (null when disconnected).</summary>
     public WatchViewModel(Func<ModbusRtuClient?> clientProvider)
@@ -23,8 +22,10 @@ public sealed class WatchViewModel : ViewModelBase, IDisposable
         ArgumentNullException.ThrowIfNull(clientProvider);
         _clientProvider = clientProvider;
         AddCommand = new RelayCommand(AddEntry);
-        RemoveSelectedCommand = new RelayCommand(RemoveSelected, () => SelectedEntry is not null);
+        RemoveSelectedCommand = new RelayCommand(RemoveSelected, () => SelectedWatchEntry is not null);
         ReadAllCommand = new AsyncRelayCommand(ReadAllAsync, () => !IsBusy, OnError);
+        SaveWatchCommand = new RelayCommand(SaveWatch);
+        LoadWatchCommand = new RelayCommand(LoadWatch);
     }
 
     /// <summary>Supported areas.</summary>
@@ -87,23 +88,31 @@ public sealed class WatchViewModel : ViewModelBase, IDisposable
     private string _extraText = string.Empty;
 
     /// <summary>Selected entry (enables Remove).</summary>
-    public WatchEntry? SelectedEntry
+    public WatchEntry? SelectedWatchEntry
     {
-        get => _selectedEntry;
+        get => _selectedWatchEntry;
         set
         {
-            if (SetProperty(ref _selectedEntry, value))
+            if (SetProperty(ref _selectedWatchEntry, value))
             {
                 RemoveSelectedCommand.RaiseCanExecuteChanged();
             }
         }
     }
 
+    private WatchEntry? _selectedWatchEntry;
+
     /// <summary>Add the configured entry.</summary>
     public RelayCommand AddCommand { get; }
 
     /// <summary>Remove the selected entry and its result row.</summary>
     public RelayCommand RemoveSelectedCommand { get; }
+
+    /// <summary>Save the watch list to a JSON file.</summary>
+    public RelayCommand SaveWatchCommand { get; }
+
+    /// <summary>Load the watch list from a JSON file (replaces current).</summary>
+    public RelayCommand LoadWatchCommand { get; }
 
     /// <summary>Read all entries once.</summary>
     public AsyncRelayCommand ReadAllCommand { get; }
@@ -182,19 +191,73 @@ public sealed class WatchViewModel : ViewModelBase, IDisposable
 
     private void RemoveSelected()
     {
-        if (SelectedEntry is null)
+        if (SelectedWatchEntry is null)
         {
             return;
         }
 
-        WatchResult? row = Results.FirstOrDefault(r => r.Entry == SelectedEntry);
+        WatchResult? row = Results.FirstOrDefault(r => r.Entry == SelectedWatchEntry);
         if (row is not null)
         {
             Results.Remove(row);
         }
 
-        Entries.Remove(SelectedEntry);
-        SelectedEntry = null;
+        Entries.Remove(SelectedWatchEntry);
+        SelectedWatchEntry = null;
+    }
+
+    private void SaveWatch()
+    {
+        try
+        {
+            Microsoft.Win32.SaveFileDialog dialog = new()
+            {
+                Filter = "Watch list (*.json)|*.json",
+                FileName = "watchlist.json",
+            };
+            if (dialog.ShowDialog() != true)
+            {
+                return;
+            }
+
+            WatchListStore.Save(dialog.FileName, Entries);
+            StatusText = $"Saved {Entries.Count} entries to {dialog.FileName}.";
+        }
+        catch (Exception ex)
+        {
+            StatusText = $"Error: {ex.Message}";
+        }
+    }
+
+    private void LoadWatch()
+    {
+        try
+        {
+            Microsoft.Win32.OpenFileDialog dialog = new()
+            {
+                Filter = "Watch list (*.json)|*.json",
+            };
+            if (dialog.ShowDialog() != true)
+            {
+                return;
+            }
+
+            WatchEntry[] loaded = WatchListStore.Load(dialog.FileName);
+            Entries.Clear();
+            Results.Clear();
+            SelectedWatchEntry = null;
+            foreach (WatchEntry entry in loaded)
+            {
+                Entries.Add(entry);
+                Results.Add(new WatchResult(entry));
+            }
+
+            StatusText = $"Loaded {loaded.Length} entries from {dialog.FileName}.";
+        }
+        catch (Exception ex)
+        {
+            StatusText = $"Error: {ex.Message}";
+        }
     }
 
     private async Task ReadAllAsync(CancellationToken cancellationToken)
@@ -231,15 +294,15 @@ public sealed class WatchViewModel : ViewModelBase, IDisposable
         WatchEntry entry = row.Entry;
         try
         {
-            row.ValuesText = entry.Area switch
+            (string dec, string hex) = entry.Area switch
             {
-                WatchArea.HoldingRegisters => ValueFormatter.FormatRegisters(
+                WatchArea.HoldingRegisters => SplitRegisters(
                     await client.ReadHoldingRegistersAsync(entry.SlaveId, entry.Start, entry.Count, ct).ConfigureAwait(false)),
-                WatchArea.InputRegisters => ValueFormatter.FormatRegisters(
+                WatchArea.InputRegisters => SplitRegisters(
                     await client.ReadInputRegistersAsync(entry.SlaveId, entry.Start, entry.Count, ct).ConfigureAwait(false)),
-                WatchArea.Coils => ValueFormatter.FormatBits(
+                WatchArea.Coils => SplitBits(
                     await client.ReadCoilsAsync(entry.SlaveId, entry.Start, entry.Count, ct).ConfigureAwait(false)),
-                WatchArea.DiscreteInputs => ValueFormatter.FormatBits(
+                WatchArea.DiscreteInputs => SplitBits(
                     await client.ReadDiscreteInputsAsync(entry.SlaveId, entry.Start, entry.Count, ct).ConfigureAwait(false)),
                 WatchArea.ExceptionStatus => await ReadWatchStatusAsync(client, entry, ct).ConfigureAwait(false),
                 WatchArea.DiagnosticsCounter => await ReadWatchDiagnosticsAsync(client, entry, ct).ConfigureAwait(false),
@@ -250,6 +313,8 @@ public sealed class WatchViewModel : ViewModelBase, IDisposable
                 WatchArea.FifoQueue => await ReadWatchFifoAsync(client, entry, ct).ConfigureAwait(false),
                 _ => throw new InvalidOperationException($"Unknown area {entry.Area}."),
             };
+            row.ValueDecText = dec;
+            row.ValueHexText = hex;
             row.Timestamp = DateTime.Now.ToString("HH:mm:ss.fff", null);
             row.Status = "OK";
         }
@@ -259,59 +324,74 @@ public sealed class WatchViewModel : ViewModelBase, IDisposable
         }
     }
 
+    private static (string Dec, string Hex) SplitRegisters(ushort[] values) =>
+        (ValueFormatter.FormatRegistersDec(values), ValueFormatter.FormatRegistersHex(values));
+
+    private static (string Dec, string Hex) SplitBits(bool[] values) =>
+        (ValueFormatter.FormatBits(values), "—");
+
     private void MarkAll(string values, string status)
     {
         foreach (WatchResult row in Results)
         {
-            row.ValuesText = values;
+            row.ValueDecText = values;
+            row.ValueHexText = "—";
             row.Status = status;
         }
     }
 
-    private static async Task<string> ReadWatchStatusAsync(ModbusRtuClient client, WatchEntry entry, CancellationToken ct)
+    private static async Task<(string Dec, string Hex)> ReadWatchStatusAsync(ModbusRtuClient client, WatchEntry entry, CancellationToken ct)
     {
         byte status = await client.ReadExceptionStatusAsync(entry.SlaveId, ct).ConfigureAwait(false);
-        return $"Status: 0x{status:X2} ({status})";
+        return (status.ToString(System.Globalization.CultureInfo.InvariantCulture), $"0x{status:X2}");
     }
 
-    private static async Task<string> ReadWatchDiagnosticsAsync(ModbusRtuClient client, WatchEntry entry, CancellationToken ct)
+    private static async Task<(string Dec, string Hex)> ReadWatchDiagnosticsAsync(ModbusRtuClient client, WatchEntry entry, CancellationToken ct)
     {
         byte[] data = ParseExtraBytes(entry.Extra);
         byte[] echo = await client.DiagnosticsAsync(entry.SlaveId, entry.Start, data, ct).ConfigureAwait(false);
-        return $"Sub 0x{entry.Start:X4} echo: {Hex.Format(echo)}";
+        return ($"Sub {entry.Start} echo: {ValueFormatter.FormatBytesDec(echo)}", ValueFormatter.FormatBytesHex(echo));
     }
 
-    private static async Task<string> ReadWatchEventCounterAsync(ModbusRtuClient client, WatchEntry entry, CancellationToken ct)
+    private static async Task<(string Dec, string Hex)> ReadWatchEventCounterAsync(ModbusRtuClient client, WatchEntry entry, CancellationToken ct)
     {
         (ushort status, ushort events) = await client.GetCommEventCounterAsync(entry.SlaveId, ct).ConfigureAwait(false);
-        return $"Status: 0x{status:X4}, Events: {events}";
+        return ($"Status: {status}, Events: {events}", $"0x{status:X4}, 0x{events:X4}");
     }
 
-    private static async Task<string> ReadWatchEventLogAsync(ModbusRtuClient client, WatchEntry entry, CancellationToken ct)
+    private static async Task<(string Dec, string Hex)> ReadWatchEventLogAsync(ModbusRtuClient client, WatchEntry entry, CancellationToken ct)
     {
         (ushort status, ushort events, ushort messages, byte[] log) =
             await client.GetCommEventLogAsync(entry.SlaveId, ct).ConfigureAwait(false);
-        return $"Status: 0x{status:X4}, Events: {events}, Messages: {messages}{Environment.NewLine}{Hex.Format(log)}";
+        return ($"Status: {status}, Events: {events}, Messages: {messages} | {ValueFormatter.FormatBytesDec(log)}",
+            ValueFormatter.FormatBytesHex(log));
     }
 
-    private static async Task<string> ReadWatchServerIdAsync(ModbusRtuClient client, WatchEntry entry, CancellationToken ct)
+    private static async Task<(string Dec, string Hex)> ReadWatchServerIdAsync(ModbusRtuClient client, WatchEntry entry, CancellationToken ct)
     {
         (byte[] id, bool running) = await client.ReportServerIdAsync(entry.SlaveId, ct).ConfigureAwait(false);
-        return $"ID: {ValueFormatter.FormatDeviceId(id)}, Running: {running}";
+        string hex = ValueFormatter.FormatBytesHex(id);
+        string ascii = ValueFormatter.FormatDeviceId(id);
+        string dec = ascii == hex
+            ? ValueFormatter.FormatBytesDec(id)
+            : $"{ascii} (Running: {running})";
+        return (dec, hex);
     }
 
-    private static async Task<string> ReadWatchFileAsync(ModbusRtuClient client, WatchEntry entry, CancellationToken ct)
+    private static async Task<(string Dec, string Hex)> ReadWatchFileAsync(ModbusRtuClient client, WatchEntry entry, CancellationToken ct)
     {
         ushort length = ParseExtraUshort(entry.Extra, "length");
         FileSubRequest[] subs = [new(entry.Start, entry.Count, length)];
         ushort[][] records = await client.ReadFileRecordAsync(entry.SlaveId, subs, ct).ConfigureAwait(false);
-        return ValueFormatter.FormatRegisters(records[0]);
+        return (ValueFormatter.FormatRegistersDec(records[0]), ValueFormatter.FormatRegistersHex(records[0]));
     }
 
-    private static async Task<string> ReadWatchFifoAsync(ModbusRtuClient client, WatchEntry entry, CancellationToken ct)
+    private static async Task<(string Dec, string Hex)> ReadWatchFifoAsync(ModbusRtuClient client, WatchEntry entry, CancellationToken ct)
     {
         ushort[] values = await client.ReadFifoQueueAsync(entry.SlaveId, entry.Start, ct).ConfigureAwait(false);
-        return values.Length == 0 ? "(empty queue)" : ValueFormatter.FormatRegisters(values);
+        return values.Length == 0
+            ? ("(empty queue)", "—")
+            : (ValueFormatter.FormatRegistersDec(values), ValueFormatter.FormatRegistersHex(values));
     }
 
     private static byte[] ParseExtraBytes(string extra)

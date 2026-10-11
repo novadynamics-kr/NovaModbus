@@ -19,6 +19,34 @@ public static class ValueFormatter
         return string.Join(Environment.NewLine, values.Select((v, i) => $"[{i}] 0x{v:X4} ({v})"));
     }
 
+    /// <summary>Registers as "v, v" (decimal).</summary>
+    public static string FormatRegistersDec(ushort[] values)
+    {
+        ArgumentNullException.ThrowIfNull(values);
+        return string.Join(", ", values.Select(v => v.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+    }
+
+    /// <summary>Registers as "0xXXXX, 0xXXXX".</summary>
+    public static string FormatRegistersHex(ushort[] values)
+    {
+        ArgumentNullException.ThrowIfNull(values);
+        return string.Join(", ", values.Select(v => $"0x{v:X4}"));
+    }
+
+    /// <summary>Bytes as decimal list.</summary>
+    public static string FormatBytesDec(byte[] data)
+    {
+        ArgumentNullException.ThrowIfNull(data);
+        return string.Join(' ', data.Select(b => b.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+    }
+
+    /// <summary>Bytes as hex list.</summary>
+    public static string FormatBytesHex(byte[] data)
+    {
+        ArgumentNullException.ThrowIfNull(data);
+        return Hex.Format(data);
+    }
+
     /// <summary>Device ID bytes as ASCII text, or hex when not printable.</summary>
     public static string FormatDeviceId(byte[] id)
     {
