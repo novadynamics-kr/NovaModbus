@@ -1,6 +1,8 @@
 using System.Collections.ObjectModel;
+using System.Globalization;
 using System.Windows.Threading;
 using NovaModbus.Rtu;
+using NovaModbus.Rtu.Codecs;
 using NovaModbus.Rtu.Commands;
 using NovaModbus.Rtu.Transport;
 using NovaModbus.Slave.Services;
@@ -19,6 +21,9 @@ public sealed class MainViewModel : ViewModelBase, IAsyncDisposable
     private string _countersText = string.Empty;
     private string _newSlaveIdText = "1";
     private byte? _selectedSlaveId;
+    private string _floatAddressText = "0";
+    private string _floatValueText = "0";
+    private FloatWordOrder _floatOrder = FloatWordOrder.Abcd;
     private bool _ignoreCrcErrors = true;
     private bool _simulateBusy;
     private bool _disposed;
@@ -31,6 +36,7 @@ public sealed class MainViewModel : ViewModelBase, IAsyncDisposable
         StopCommand = new AsyncRelayCommand(StopAsync, () => IsRunning, OnError);
         AddSlaveCommand = new RelayCommand(AddSlave);
         RemoveSlaveCommand = new RelayCommand(RemoveSlave, () => SelectedSlaveId is not null);
+        WriteFloatCommand = new RelayCommand(WriteFloat);
         _counterTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
         _counterTimer.Tick += (_, _) => RefreshCounters();
         _counterTimer.Start();
@@ -128,6 +134,39 @@ public sealed class MainViewModel : ViewModelBase, IAsyncDisposable
 
     /// <summary>Remove the selected slave ID.</summary>
     public RelayCommand RemoveSlaveCommand { get; }
+
+    /// <summary>Supported float word orders.</summary>
+    public IReadOnlyList<FloatWordOrder> FloatOrders { get; } =
+    [
+        FloatWordOrder.Abcd,
+        FloatWordOrder.Cdab,
+        FloatWordOrder.Badc,
+        FloatWordOrder.Dcba,
+    ];
+
+    /// <summary>Float write address text.</summary>
+    public string FloatAddressText
+    {
+        get => _floatAddressText;
+        set => SetProperty(ref _floatAddressText, value);
+    }
+
+    /// <summary>Float value text.</summary>
+    public string FloatValueText
+    {
+        get => _floatValueText;
+        set => SetProperty(ref _floatValueText, value);
+    }
+
+    /// <summary>Float word order.</summary>
+    public FloatWordOrder FloatOrder
+    {
+        get => _floatOrder;
+        set => SetProperty(ref _floatOrder, value);
+    }
+
+    /// <summary>Write the float to the selected slave store.</summary>
+    public RelayCommand WriteFloatCommand { get; }
 
     private async Task StartAsync(CancellationToken cancellationToken)
     {
@@ -300,6 +339,39 @@ public sealed class MainViewModel : ViewModelBase, IAsyncDisposable
     }
 
     private void OnError(Exception ex) => StatusText = $"Error: {ex.Message}";
+
+    private void WriteFloat()
+    {
+        try
+        {
+            if (SelectedSlaveId is null || !_stores.TryGetValue(SelectedSlaveId.Value, out ModbusDataStore? store))
+            {
+                StatusText = "Select a slave ID.";
+                return;
+            }
+
+            if (!ushort.TryParse(FloatAddressText, out ushort address) || address + 1 >= store.HoldingCount)
+            {
+                StatusText = $"Invalid address: '{FloatAddressText}' (needs 2 registers).";
+                return;
+            }
+
+            if (!float.TryParse(FloatValueText, NumberStyles.Float, CultureInfo.InvariantCulture, out float value))
+            {
+                StatusText = $"Invalid float: '{FloatValueText}'.";
+                return;
+            }
+
+            ushort[] regs = Float32Codec.Encode(value, FloatOrder);
+            store.WriteHolding(address, regs);
+            StatusText = $"Wrote {value} as 0x{regs[0]:X4} 0x{regs[1]:X4} @ {address} ({FloatOrder}).";
+            RefreshRows();
+        }
+        catch (Exception ex)
+        {
+            StatusText = $"Error: {ex.Message}";
+        }
+    }
 
     /// <inheritdoc />
     public async ValueTask DisposeAsync()

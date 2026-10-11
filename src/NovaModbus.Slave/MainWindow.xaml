@@ -124,6 +124,25 @@
                 <ListBox Margin="8" FontFamily="Consolas"
                          ItemsSource="{Binding Lines}"/>
             </TabItem>
+            <TabItem Header="Float">
+                <StackPanel Margin="8">
+                    <Label Content="Address (2 registers)"/>
+                    <TextBox Width="120" HorizontalAlignment="Left"
+                             Text="{Binding FloatAddressText, UpdateSourceTrigger=PropertyChanged}"/>
+                    <Label Content="Float value" Margin="0,8,0,0"/>
+                    <TextBox Width="200" HorizontalAlignment="Left"
+                             Text="{Binding FloatValueText, UpdateSourceTrigger=PropertyChanged}"/>
+                    <Label Content="Word order" Margin="0,8,0,0"/>
+                    <ComboBox Width="200" HorizontalAlignment="Left"
+                              ItemsSource="{Binding FloatOrders}"
+                              SelectedItem="{Binding FloatOrder}"/>
+                    <Button Content="Write Float" Width="200" HorizontalAlignment="Left"
+                            Margin="0,12,0,0" Padding="0,4"
+                            Command="{Binding WriteFloatCommand}"/>
+                    <TextBlock Margin="0,8,0,0" TextWrapping="Wrap"
+                               Text="{Binding StatusText}"/>
+                </StackPanel>
+            </TabItem>
         </TabControl>
     </Grid>
 </Window>
