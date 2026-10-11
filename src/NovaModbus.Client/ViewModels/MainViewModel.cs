@@ -24,6 +24,7 @@ public sealed class MainViewModel : ViewModelBase, IAsyncDisposable
         SerialSettings = new SerialPortSettingsViewModel(_bus);
         Connection = new ModbusConnection(CommLog);
         ReadWrite = new ReadWriteViewModel(() => Connection.Client);
+        Watch = new WatchViewModel(() => Connection.Client);
         Polling = new PollingViewModel(ReadWrite);
         Connection.ConnectionChanged += OnConnectionChanged;
 
@@ -57,6 +58,9 @@ public sealed class MainViewModel : ViewModelBase, IAsyncDisposable
 
     /// <summary>Single-shot function execution tab.</summary>
     public ReadWriteViewModel ReadWrite { get; }
+
+    /// <summary>Watch list tab.</summary>
+    public WatchViewModel Watch { get; }
 
     /// <summary>Polling tab.</summary>
     public PollingViewModel Polling { get; }
@@ -167,6 +171,7 @@ public sealed class MainViewModel : ViewModelBase, IAsyncDisposable
 
         _disposed = true;
         Polling.Dispose();
+        Watch.Dispose();
         StopTestSlave();
         await Connection.DisposeAsync().ConfigureAwait(false);
         _bus.Unpublish(TestSlaveEndpoint);

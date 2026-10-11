@@ -1,4 +1,5 @@
 using NovaModbus.Rtu.Commands;
+using NovaModbus.Client.Services;
 using NovaModbus.Rtu;
 using NovaModbus.Rtu.Enums;
 
@@ -146,10 +147,10 @@ public sealed class ReadWriteViewModel : ViewModelBase
             ushort start = ParseUshort(StartText, "start address");
             ResultText = SelectedFunction switch
             {
-                ModbusFunction.ReadCoils => FormatBits(await client.ReadCoilsAsync(slaveId, start, ParseCount(), cancellationToken).ConfigureAwait(false)),
-                ModbusFunction.ReadDiscreteInputs => FormatBits(await client.ReadDiscreteInputsAsync(slaveId, start, ParseCount(), cancellationToken).ConfigureAwait(false)),
-                ModbusFunction.ReadHoldingRegisters => FormatRegisters(await client.ReadHoldingRegistersAsync(slaveId, start, ParseCount(), cancellationToken).ConfigureAwait(false)),
-                ModbusFunction.ReadInputRegisters => FormatRegisters(await client.ReadInputRegistersAsync(slaveId, start, ParseCount(), cancellationToken).ConfigureAwait(false)),
+                ModbusFunction.ReadCoils => ValueFormatter.FormatBits(await client.ReadCoilsAsync(slaveId, start, ParseCount(), cancellationToken).ConfigureAwait(false)),
+                ModbusFunction.ReadDiscreteInputs => ValueFormatter.FormatBits(await client.ReadDiscreteInputsAsync(slaveId, start, ParseCount(), cancellationToken).ConfigureAwait(false)),
+                ModbusFunction.ReadHoldingRegisters => ValueFormatter.FormatRegisters(await client.ReadHoldingRegistersAsync(slaveId, start, ParseCount(), cancellationToken).ConfigureAwait(false)),
+                ModbusFunction.ReadInputRegisters => ValueFormatter.FormatRegisters(await client.ReadInputRegistersAsync(slaveId, start, ParseCount(), cancellationToken).ConfigureAwait(false)),
                 ModbusFunction.WriteSingleCoil => await WriteSingleCoilAsync(client, slaveId, start, cancellationToken).ConfigureAwait(false),
                 ModbusFunction.WriteSingleRegister => await WriteSingleRegisterAsync(client, slaveId, start, cancellationToken).ConfigureAwait(false),
                 ModbusFunction.WriteMultipleCoils => await WriteMultipleCoilsAsync(client, slaveId, start, cancellationToken).ConfigureAwait(false),
@@ -295,10 +296,4 @@ public sealed class ReadWriteViewModel : ViewModelBase
 
         return values;
     }
-
-    private static string FormatBits(bool[] values) =>
-        string.Join(' ', values.Select(b => b ? "1" : "0"));
-
-    private static string FormatRegisters(ushort[] values) =>
-        string.Join(Environment.NewLine, values.Select((v, i) => $"[{i}] 0x{v:X4} ({v})"));
 }

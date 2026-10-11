@@ -138,6 +138,84 @@
                 <ListBox Margin="8" FontFamily="Consolas"
                          ItemsSource="{Binding Lines}"/>
             </TabItem>
+            <TabItem Header="Watch" DataContext="{Binding Watch}">
+                <Grid Margin="8">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <StackPanel Grid.Row="0" Orientation="Horizontal">
+                        <StackPanel Margin="0,0,8,0">
+                            <Label Content="Slave ID"/>
+                            <TextBox Width="70" Text="{Binding SlaveIdText, UpdateSourceTrigger=PropertyChanged}"/>
+                        </StackPanel>
+                        <StackPanel Margin="0,0,8,0">
+                            <Label Content="Area"/>
+                            <ComboBox Width="140" ItemsSource="{Binding Areas}"
+                                      SelectedItem="{Binding Area}"/>
+                        </StackPanel>
+                        <StackPanel Margin="0,0,8,0">
+                            <Label Content="Start"/>
+                            <TextBox Width="80" Text="{Binding StartText, UpdateSourceTrigger=PropertyChanged}"/>
+                        </StackPanel>
+                        <StackPanel Margin="0,0,8,0">
+                            <Label Content="Count"/>
+                            <TextBox Width="80" Text="{Binding CountText, UpdateSourceTrigger=PropertyChanged}"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Bottom">
+                            <Button Content="Add" Padding="16,2" Margin="0,0,4,1"
+                                    Command="{Binding AddCommand}"/>
+                            <Button Content="Remove" Padding="16,2" Margin="0,0,0,1"
+                                    Command="{Binding RemoveSelectedCommand}"/>
+                        </StackPanel>
+                    </StackPanel>
+
+                    <StackPanel Grid.Row="1" Margin="0,8,0,0" Orientation="Horizontal">
+                        <Button Content="Read All" Padding="16,2" Margin="0,0,8,0"
+                                Command="{Binding ReadAllCommand}"/>
+                        <CheckBox Content="Auto-refresh" VerticalAlignment="Center" Margin="0,0,8,0"
+                                  IsChecked="{Binding AutoRefresh}"/>
+                        <TextBox Width="80" VerticalAlignment="Center"
+                                 Text="{Binding AutoIntervalMsText, UpdateSourceTrigger=PropertyChanged}"/>
+                        <Label Content="ms"/>
+                        <TextBlock VerticalAlignment="Center" Margin="8,0,0,0"
+                                   Text="{Binding StatusText}"/>
+                    </StackPanel>
+
+                    <DataGrid Grid.Row="2" Margin="0,8,0,0" AutoGenerateColumns="False"
+                              IsReadOnly="True" ItemsSource="{Binding Entries}"
+                              SelectedItem="{Binding SelectedEntry}">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Slave" Binding="{Binding SlaveId}"/>
+                            <DataGridTextColumn Header="Area" Binding="{Binding Area}"/>
+                            <DataGridTextColumn Header="Start" Binding="{Binding Start}"/>
+                            <DataGridTextColumn Header="Count" Binding="{Binding Count}"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+
+                    <DataGrid Grid.Row="3" Margin="0,8,0,0" AutoGenerateColumns="False"
+                              IsReadOnly="True" ItemsSource="{Binding Results}">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Slave" Binding="{Binding Entry.SlaveId}"/>
+                            <DataGridTextColumn Header="Area" Binding="{Binding Entry.Area}"/>
+                            <DataGridTextColumn Header="Start" Binding="{Binding Entry.Start}"/>
+                            <DataGridTextColumn Header="Values" Binding="{Binding ValuesText}" Width="*">
+                                <DataGridTextColumn.ElementStyle>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="TextWrapping" Value="Wrap"/>
+                                        <Setter Property="FontFamily" Value="Consolas"/>
+                                    </Style>
+                                </DataGridTextColumn.ElementStyle>
+                            </DataGridTextColumn>
+                            <DataGridTextColumn Header="Time" Binding="{Binding Timestamp}"/>
+                            <DataGridTextColumn Header="Status" Binding="{Binding Status}"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </Grid>
+            </TabItem>
         </TabControl>
     </Grid>
 </Window>
