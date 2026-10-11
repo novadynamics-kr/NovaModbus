@@ -172,6 +172,12 @@ public sealed class WatchViewModel : ViewModelBase, IDisposable
         try
         {
             WatchEntry entry = ParseEntry();
+            if (Entries.Contains(entry))
+            {
+                StatusText = "Already in the list.";
+                return;
+            }
+
             Entries.Add(entry);
             Results.Add(new WatchResult(entry));
             StatusText = string.Empty;
@@ -182,11 +188,11 @@ public sealed class WatchViewModel : ViewModelBase, IDisposable
         }
     }
 
-    /// <summary>Remove entries and their result rows (multi-select).</summary>
+    /// <summary>Remove exactly the given instances (reference equality — equal values stay).</summary>
     public void RemoveEntries(IEnumerable<WatchEntry> entries)
     {
         ArgumentNullException.ThrowIfNull(entries);
-        HashSet<WatchEntry> doomed = [.. entries];
+        HashSet<WatchEntry> doomed = new(entries, ReferenceEqualityComparer.Instance);
         if (doomed.Count == 0)
         {
             return;

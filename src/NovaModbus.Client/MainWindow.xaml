@@ -200,7 +200,7 @@
                     </StackPanel>
 
                     <DataGrid Grid.Row="2" Margin="0,8,0,0" Name="WatchGrid"
-                              AutoGenerateColumns="False"
+                              AutoGenerateColumns="False" CanUserDeleteRows="False"
                               IsReadOnly="True" ItemsSource="{Binding Entries}"
                               SelectionMode="Extended"
                               KeyDown="OnWatchDeleteKey">
@@ -215,6 +215,7 @@
                     </DataGrid>
 
                     <DataGrid Grid.Row="3" Margin="0,8,0,0" AutoGenerateColumns="False"
+                              CanUserDeleteRows="False"
                               IsReadOnly="True" ItemsSource="{Binding Results}">
                         <DataGrid.Columns>
                             <DataGridTextColumn Header="Slave" Binding="{Binding Entry.SlaveId}"/>
