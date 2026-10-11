@@ -78,7 +78,8 @@ Errors/ — ModbusException, CrcMismatchException 등
 Logging/ — IModbusLogger (Action<string> 기반, 외부 로거 의존 없음)
 ```
 
-- 지원 Function 1차: `01,02,03,04,05,06,15,16` + Exception 응답. `08,11,17,22,23`은 2차.
+- 지원 Function: `01,02,03,04,05,06,07,08,0B,0C,0F,10,11,14,15,16,17,18` +
+  Exception 응답 (`01-08,0A,0B`). 미지원: `2B`/MEI, 사용자 정의 FC.
 - CRC는 little-endian (`CrcLo` 먼저). Baudrate 연동 3.5char 계산식으로 타임아웃 산출.
 - 모든 public API에 XML doc. 모든 codec에 round-trip 단위테스트.
 

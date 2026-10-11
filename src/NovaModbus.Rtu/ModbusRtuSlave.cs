@@ -48,6 +48,7 @@ public sealed class ModbusRtuSlave : IAsyncDisposable
         ArgumentNullException.ThrowIfNull(requestWire);
         if (!ModbusFrame.TryDecode(requestWire, out ModbusFrame? frame) || frame is null)
         {
+            Engine.NoteBusCrcError();
             if (IgnoreCrcErrors)
             {
                 return null;
@@ -56,19 +57,35 @@ public sealed class ModbusRtuSlave : IAsyncDisposable
             throw new CrcMismatchException("CRC mismatch on received frame.");
         }
 
+        Engine.NoteBusMessage();
         if (!Engine.TryGetStore(frame.SlaveId, out ModbusDataStore? store) || store is null)
         {
             return null;
         }
 
         Engine.IncrementCount(frame.SlaveId);
+        store.NoteSlaveMessage();
+        store.NoteEvent(0x00);
         _logger.LogRx(requestWire);
         if (SimulateBusy)
         {
-            return ExceptionFrame(frame.SlaveId, frame.Function, ModbusExceptionCode.SlaveDeviceBusy);
+            store.NoteBusy();
+            return ExceptionResponse(frame.SlaveId, frame.Function, ModbusExceptionCode.SlaveDeviceBusy, store);
         }
 
-        byte[] response = Dispatch(frame.SlaveId, frame.Function, frame.Data, store);
+        byte[]? response = Dispatch(frame.SlaveId, frame.Function, frame.Data, store, Engine);
+        if (response is null)
+        {
+            store.NoteNoResponse();
+            return null;
+        }
+
+        if ((response[1] & 0x80) != 0)
+        {
+            store.NoteSlaveException();
+            store.NoteEvent(0xFF);
+        }
+
         _logger.LogTx(response);
         return response;
     }
@@ -92,7 +109,7 @@ public sealed class ModbusRtuSlave : IAsyncDisposable
         return true;
     }
 
-    private static byte[] Dispatch(byte slaveId, byte functionByte, byte[] data, ModbusDataStore store)
+    private static byte[]? Dispatch(byte slaveId, byte functionByte, byte[] data, ModbusDataStore store, ModbusSlaveEngine engine)
     {
         ModbusFunction function = (ModbusFunction)functionByte;
         return function switch
@@ -103,10 +120,27 @@ public sealed class ModbusRtuSlave : IAsyncDisposable
             ModbusFunction.ReadInputRegisters => HandleReadRegisters(slaveId, functionByte, data, store.InputCount, store.ReadInput),
             ModbusFunction.WriteSingleCoil => HandleWriteSingleCoil(slaveId, functionByte, data, store),
             ModbusFunction.WriteSingleRegister => HandleWriteSingleRegister(slaveId, functionByte, data, store),
+            ModbusFunction.ReadExceptionStatus => OkFrame(slaveId, functionByte, [store.ExceptionStatus]),
+            ModbusFunction.Diagnostics => HandleDiagnostics(slaveId, functionByte, data, store, engine),
+            ModbusFunction.GetCommEventCounter => HandleCommEventCounter(slaveId, functionByte, store),
+            ModbusFunction.GetCommEventLog => HandleCommEventLog(slaveId, functionByte, store),
             ModbusFunction.WriteMultipleCoils => HandleWriteMultipleCoils(slaveId, functionByte, data, store),
             ModbusFunction.WriteMultipleRegisters => HandleWriteMultipleRegisters(slaveId, functionByte, data, store),
+            ModbusFunction.ReportServerId => HandleReportServerId(slaveId, functionByte, store),
+            ModbusFunction.ReadFileRecord => HandleReadFileRecord(slaveId, functionByte, data, store),
+            ModbusFunction.WriteFileRecord => HandleWriteFileRecord(slaveId, functionByte, data, store),
+            ModbusFunction.MaskWriteRegister => HandleMaskWrite(slaveId, functionByte, data, store),
+            ModbusFunction.ReadWriteMultipleRegisters => HandleReadWriteMultiple(slaveId, functionByte, data, store),
+            ModbusFunction.ReadFifoQueue => HandleReadFifo(slaveId, functionByte, data, store),
             _ => ExceptionFrame(slaveId, functionByte, ModbusExceptionCode.IllegalFunction),
         };
+    }
+
+    private static byte[] ExceptionResponse(byte slaveId, byte function, ModbusExceptionCode code, ModbusDataStore store)
+    {
+        store.NoteSlaveException();
+        store.NoteEvent(0xFF);
+        return ExceptionFrame(slaveId, function, code);
     }
 
     private static byte[] HandleReadBits(byte slaveId, byte function, byte[] data, int capacity, Func<ushort, ushort, bool[]> read)
@@ -220,6 +254,204 @@ public sealed class ModbusRtuSlave : IAsyncDisposable
             return ExceptionFrame(slaveId, function, ModbusExceptionCode.IllegalDataValue);
         }
     }
+
+    private static byte[]? HandleDiagnostics(byte slaveId, byte function, byte[] data, ModbusDataStore store, ModbusSlaveEngine engine)
+    {
+        ushort subfunction;
+        byte[] payload;
+        try
+        {
+            DiagnosticsCodec.Decode(data, out subfunction, out payload);
+        }
+        catch (ArgumentException)
+        {
+            return ExceptionFrame(slaveId, function, ModbusExceptionCode.IllegalDataValue);
+        }
+
+        return subfunction switch
+        {
+            DiagnosticsCodec.Subfunctions.ReturnQueryData => OkFrame(slaveId, function, data),
+            DiagnosticsCodec.Subfunctions.RestartCommunicationsOption => HandleRestartOption(slaveId, function, data, payload, store),
+            DiagnosticsCodec.Subfunctions.ReturnDiagnosticRegister => OkFrame(slaveId, function,
+                DiagnosticsCodec.Encode(subfunction, DiagnosticsCodec.CounterData(store.DiagnosticRegister))),
+            DiagnosticsCodec.Subfunctions.ForceListenOnlyMode => null,
+            DiagnosticsCodec.Subfunctions.ClearCounters => ClearAllCounters(slaveId, function, data, subfunction, store, engine),
+            DiagnosticsCodec.Subfunctions.ReturnBusMessageCount => CounterFrame(slaveId, function, subfunction, engine.BusMessageCount),
+            DiagnosticsCodec.Subfunctions.ReturnBusCommErrorCount => CounterFrame(slaveId, function, subfunction, engine.BusCrcErrorCount),
+            DiagnosticsCodec.Subfunctions.ReturnSlaveExceptionCount => CounterFrame(slaveId, function, subfunction, store.SlaveExceptionCount),
+            DiagnosticsCodec.Subfunctions.ReturnSlaveMessageCount => CounterFrame(slaveId, function, subfunction, store.SlaveMessageCount),
+            DiagnosticsCodec.Subfunctions.ReturnSlaveNoResponseCount => CounterFrame(slaveId, function, subfunction, store.NoResponseCount),
+            DiagnosticsCodec.Subfunctions.ReturnSlaveBusyCount => CounterFrame(slaveId, function, subfunction, store.BusyCount),
+            DiagnosticsCodec.Subfunctions.ReturnBusOverrunCount => CounterFrame(slaveId, function, subfunction, 0),
+            _ => ExceptionFrame(slaveId, function, ModbusExceptionCode.IllegalFunction),
+        };
+    }
+
+    private static byte[] HandleRestartOption(byte slaveId, byte function, byte[] data, byte[] payload, ModbusDataStore store)
+    {
+        if (payload is not ([0x00, 0x00] or [0xFF, 0x00]))
+        {
+            return ExceptionFrame(slaveId, function, ModbusExceptionCode.IllegalDataValue);
+        }
+
+        if (payload[0] == 0xFF)
+        {
+            store.ClearEventLog();
+        }
+
+        return OkFrame(slaveId, function, data);
+    }
+
+    private static byte[] ClearAllCounters(byte slaveId, byte function, byte[] data, ushort subfunction, ModbusDataStore store, ModbusSlaveEngine engine)
+    {
+        store.ResetCounters();
+        engine.ResetBusCounters();
+        return OkFrame(slaveId, function, DiagnosticsCodec.Encode(subfunction, [0x00, 0x00]));
+    }
+
+    private static byte[] CounterFrame(byte slaveId, byte function, ushort subfunction, long value) =>
+        OkFrame(slaveId, function, DiagnosticsCodec.Encode(subfunction, DiagnosticsCodec.CounterData(Clamp16(value))));
+
+    private static byte[] HandleCommEventCounter(byte slaveId, byte function, ModbusDataStore store) =>
+        OkFrame(slaveId, function, CommEventCounterCodec.EncodeResponse(0x0000, Clamp16(store.EventCount)));
+
+    private static byte[] HandleCommEventLog(byte slaveId, byte function, ModbusDataStore store) =>
+        OkFrame(slaveId, function, CommEventLogCodec.EncodeResponse(
+            0x0000, Clamp16(store.EventCount), Clamp16(store.SlaveMessageCount), store.ReadEventLog()));
+
+    private static byte[] HandleReportServerId(byte slaveId, byte function, ModbusDataStore store)
+    {
+        byte[] identity = System.Text.Encoding.ASCII.GetBytes(store.ServerIdentity);
+        return OkFrame(slaveId, function, ServerIdCodec.EncodeResponse(identity, true, store.GetAdditionalData()));
+    }
+
+    private static byte[] HandleReadFileRecord(byte slaveId, byte function, byte[] data, ModbusDataStore store)
+    {
+        FileSubRequest[] subs;
+        try
+        {
+            subs = FileRecordCodec.DecodeReadRequest(data);
+        }
+        catch (ArgumentException)
+        {
+            return ExceptionFrame(slaveId, function, ModbusExceptionCode.IllegalDataValue);
+        }
+
+        List<ushort[]> records = new(subs.Length);
+        foreach (FileSubRequest sub in subs)
+        {
+            try
+            {
+                records.Add(store.ReadFileRecord(sub.FileNumber, sub.RecordNumber, sub.Length));
+            }
+            catch (ArgumentOutOfRangeException)
+            {
+                return ExceptionFrame(slaveId, function, ModbusExceptionCode.IllegalDataAddress);
+            }
+        }
+
+        return OkFrame(slaveId, function, FileRecordCodec.EncodeReadResponse(records));
+    }
+
+    private static byte[] HandleWriteFileRecord(byte slaveId, byte function, byte[] data, ModbusDataStore store)
+    {
+        FileSubRequest[] subs;
+        ushort[][] datas;
+        try
+        {
+            FileRecordCodec.DecodeWriteRequest(data, out subs, out datas);
+        }
+        catch (ArgumentException)
+        {
+            return ExceptionFrame(slaveId, function, ModbusExceptionCode.IllegalDataValue);
+        }
+
+        for (int i = 0; i < subs.Length; i++)
+        {
+            try
+            {
+                store.WriteFileRecord(subs[i].FileNumber, subs[i].RecordNumber, datas[i]);
+            }
+            catch (ArgumentOutOfRangeException)
+            {
+                return ExceptionFrame(slaveId, function, ModbusExceptionCode.IllegalDataAddress);
+            }
+        }
+
+        return OkFrame(slaveId, function, FileRecordCodec.EncodeWriteResponse(subs));
+    }
+
+    private static byte[] HandleMaskWrite(byte slaveId, byte function, byte[] data, ModbusDataStore store)
+    {
+        try
+        {
+            MaskWriteCodec.Decode(data, out ushort address, out ushort andMask, out ushort orMask);
+            if (!InRange(address, 1, store.HoldingCount))
+            {
+                return ExceptionFrame(slaveId, function, ModbusExceptionCode.IllegalDataAddress);
+            }
+
+            ushort current = store.ReadHolding(address, 1)[0];
+            store.WriteHolding(address, MaskWriteCodec.Apply(current, andMask, orMask));
+            return OkFrame(slaveId, function, data);
+        }
+        catch (ArgumentException)
+        {
+            return ExceptionFrame(slaveId, function, ModbusExceptionCode.IllegalDataValue);
+        }
+    }
+
+    private static byte[] HandleReadWriteMultiple(byte slaveId, byte function, byte[] data, ModbusDataStore store)
+    {
+        ushort readStart;
+        ushort readCount;
+        ushort writeStart;
+        ushort[] writeValues;
+        try
+        {
+            ReadWriteMultipleCodec.DecodeRequest(data, out readStart, out readCount, out writeStart, out writeValues);
+        }
+        catch (ArgumentException)
+        {
+            return ExceptionFrame(slaveId, function, ModbusExceptionCode.IllegalDataValue);
+        }
+
+        if (!InRange(writeStart, writeValues.Length, store.HoldingCount) || !InRange(readStart, readCount, store.HoldingCount))
+        {
+            return ExceptionFrame(slaveId, function, ModbusExceptionCode.IllegalDataAddress);
+        }
+
+        store.WriteHolding(writeStart, writeValues);
+        return OkFrame(slaveId, function, ReadWriteMultipleCodec.EncodeResponse(store.ReadHolding(readStart, readCount)));
+    }
+
+    private static byte[] HandleReadFifo(byte slaveId, byte function, byte[] data, ModbusDataStore store)
+    {
+        ushort pointer;
+        try
+        {
+            pointer = FifoQueueCodec.DecodeRequest(data);
+        }
+        catch (ArgumentException)
+        {
+            return ExceptionFrame(slaveId, function, ModbusExceptionCode.IllegalDataValue);
+        }
+
+        if (!store.FifoExists(pointer))
+        {
+            return ExceptionFrame(slaveId, function, ModbusExceptionCode.IllegalDataAddress);
+        }
+
+        ushort[] values = store.PeekFifo(pointer);
+        if (values.Length > ModbusLimits.MaxFifoCount)
+        {
+            return ExceptionFrame(slaveId, function, ModbusExceptionCode.IllegalDataValue);
+        }
+
+        return OkFrame(slaveId, function, FifoQueueCodec.EncodeResponse(values));
+    }
+
+    private static ushort Clamp16(long value) => (ushort)Math.Min(value, (long)ushort.MaxValue);
 
     private static bool InRange(int start, int count, int capacity) =>
         start >= 0 && count >= 0 && start + count <= capacity;

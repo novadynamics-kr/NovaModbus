@@ -35,4 +35,26 @@ public sealed class ModbusSlaveEngine
 
     /// <summary>Get the request counter for a slave ID (0 when unknown).</summary>
     public long GetCount(byte slaveId) => _requestCounts.TryGetValue(slaveId, out long v) ? v : 0;
+
+    /// <summary>Gets the valid-frame bus message count (device level).</summary>
+    public long BusMessageCount => Interlocked.Read(ref _busMessageCount);
+
+    /// <summary>Gets the CRC-error frame count (device level).</summary>
+    public long BusCrcErrorCount => Interlocked.Read(ref _busCrcErrorCount);
+
+    /// <summary>Record a CRC-valid frame on the line.</summary>
+    public void NoteBusMessage() => Interlocked.Increment(ref _busMessageCount);
+
+    /// <summary>Record a CRC-error frame on the line.</summary>
+    public void NoteBusCrcError() => Interlocked.Increment(ref _busCrcErrorCount);
+
+    /// <summary>Reset device-level bus counters.</summary>
+    public void ResetBusCounters()
+    {
+        Interlocked.Exchange(ref _busMessageCount, 0);
+        Interlocked.Exchange(ref _busCrcErrorCount, 0);
+    }
+
+    private long _busMessageCount;
+    private long _busCrcErrorCount;
 }

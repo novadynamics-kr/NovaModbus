@@ -1,3 +1,5 @@
+using NovaModbus.Rtu.Codecs;
+
 namespace NovaModbus.Rtu;
 
 /// <summary>Thread-safe Modbus data store for one slave ID.</summary>
@@ -8,6 +10,15 @@ public sealed class ModbusDataStore
     private readonly bool[] _discreteInputs;
     private readonly ushort[] _holdingRegisters;
     private readonly ushort[] _inputRegisters;
+    private readonly Dictionary<ushort, ushort[]> _files = [];
+    private readonly Dictionary<ushort, Queue<ushort>> _fifos = [];
+    private readonly Queue<byte> _eventLog = [];
+    private byte[] _additionalData = [];
+    private int _slaveMessageCount;
+    private int _slaveExceptionCount;
+    private int _noResponseCount;
+    private int _busyCount;
+    private int _eventCount;
 
     /// <summary>Initializes a store with the given capacities.</summary>
     public ModbusDataStore(int coilCount = 1000, int discreteCount = 1000, int holdingCount = 1000, int inputCount = 1000)
@@ -137,6 +148,202 @@ public sealed class ModbusDataStore
             {
                 _discreteInputs[start + i] = values[i];
             }
+        }
+    }
+
+    /// <summary>Gets or sets the exception status byte (FC07).</summary>
+    public byte ExceptionStatus { get; set; }
+
+    /// <summary>Gets or sets the diagnostic register (FC08 sub 0x0002).</summary>
+    public ushort DiagnosticRegister { get; set; }
+
+    /// <summary>Gets or sets the server identity string (FC11, ASCII).</summary>
+    public string ServerIdentity { get; set; } = "NovaModbus";
+
+    /// <summary>Gets a copy of the FC11 additional data.</summary>
+    public byte[] GetAdditionalData()
+    {
+        lock (_sync)
+        {
+            return [.. _additionalData];
+        }
+    }
+
+    /// <summary>Sets the FC11 additional data.</summary>
+    public void SetAdditionalData(byte[] data)
+    {
+        ArgumentNullException.ThrowIfNull(data);
+        lock (_sync)
+        {
+            _additionalData = [.. data];
+        }
+    }
+
+    /// <summary>Creates or resizes a file record area (simulator setup).</summary>
+    public void EnsureFile(ushort fileNumber, int recordCapacity)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(recordCapacity, 0);
+        lock (_sync)
+        {
+            _files[fileNumber] = new ushort[recordCapacity];
+        }
+    }
+
+    /// <summary>Whether a file record area exists.</summary>
+    public bool FileExists(ushort fileNumber)
+    {
+        lock (_sync)
+        {
+            return _files.ContainsKey(fileNumber);
+        }
+    }
+
+    /// <summary>Read file records (bounds checked).</summary>
+    public ushort[] ReadFileRecord(ushort fileNumber, ushort recordNumber, ushort length)
+    {
+        lock (_sync)
+        {
+            if (!_files.TryGetValue(fileNumber, out ushort[]? file))
+            {
+                throw new ArgumentOutOfRangeException(nameof(fileNumber), "Unknown file number.");
+            }
+
+            CheckRange(recordNumber, length, file.Length);
+            return file.AsSpan(recordNumber, length).ToArray();
+        }
+    }
+
+    /// <summary>Write file records (bounds checked).</summary>
+    public void WriteFileRecord(ushort fileNumber, ushort recordNumber, ReadOnlySpan<ushort> values)
+    {
+        lock (_sync)
+        {
+            if (!_files.TryGetValue(fileNumber, out ushort[]? file))
+            {
+                throw new ArgumentOutOfRangeException(nameof(fileNumber), "Unknown file number.");
+            }
+
+            CheckRange(recordNumber, values.Length, file.Length);
+            values.CopyTo(file.AsSpan(recordNumber, values.Length));
+        }
+    }
+
+    /// <summary>Creates an empty FIFO queue (simulator setup).</summary>
+    public void EnsureFifo(ushort pointerAddress)
+    {
+        lock (_sync)
+        {
+            _fifos.TryAdd(pointerAddress, new Queue<ushort>());
+        }
+    }
+
+    /// <summary>Whether a FIFO queue exists.</summary>
+    public bool FifoExists(ushort pointerAddress)
+    {
+        lock (_sync)
+        {
+            return _fifos.ContainsKey(pointerAddress);
+        }
+    }
+
+    /// <summary>Append a value to a FIFO queue (simulator side).</summary>
+    public void EnqueueFifo(ushort pointerAddress, ushort value)
+    {
+        lock (_sync)
+        {
+            if (!_fifos.TryGetValue(pointerAddress, out Queue<ushort>? queue))
+            {
+                throw new ArgumentOutOfRangeException(nameof(pointerAddress), "Unknown FIFO pointer.");
+            }
+
+            queue.Enqueue(value);
+        }
+    }
+
+    /// <summary>Non-destructive snapshot of a FIFO queue.</summary>
+    public ushort[] PeekFifo(ushort pointerAddress)
+    {
+        lock (_sync)
+        {
+            if (!_fifos.TryGetValue(pointerAddress, out Queue<ushort>? queue))
+            {
+                throw new ArgumentOutOfRangeException(nameof(pointerAddress), "Unknown FIFO pointer.");
+            }
+
+            return [.. queue];
+        }
+    }
+
+    /// <summary>Gets the served-message count for this ID.</summary>
+    public int SlaveMessageCount => Volatile.Read(ref _slaveMessageCount);
+
+    /// <summary>Gets the exception-response count for this ID.</summary>
+    public int SlaveExceptionCount => Volatile.Read(ref _slaveExceptionCount);
+
+    /// <summary>Gets the no-response count for this ID.</summary>
+    public int NoResponseCount => Volatile.Read(ref _noResponseCount);
+
+    /// <summary>Gets the busy-response count for this ID.</summary>
+    public int BusyCount => Volatile.Read(ref _busyCount);
+
+    /// <summary>Gets the comm-event count for this ID.</summary>
+    public int EventCount => Volatile.Read(ref _eventCount);
+
+    /// <summary>Record a served request.</summary>
+    public void NoteSlaveMessage() => Interlocked.Increment(ref _slaveMessageCount);
+
+    /// <summary>Record an exception response.</summary>
+    public void NoteSlaveException() => Interlocked.Increment(ref _slaveExceptionCount);
+
+    /// <summary>Record an addressed-but-unanswered request.</summary>
+    public void NoteNoResponse() => Interlocked.Increment(ref _noResponseCount);
+
+    /// <summary>Record a busy response.</summary>
+    public void NoteBusy() => Interlocked.Increment(ref _busyCount);
+
+    /// <summary>Record a comm event and append a log byte.</summary>
+    public void NoteEvent(byte eventByte)
+    {
+        lock (_sync)
+        {
+            _eventCount++;
+            _eventLog.Enqueue(eventByte);
+            while (_eventLog.Count > ModbusLimits.MaxEventLogBytes)
+            {
+                _eventLog.Dequeue();
+            }
+        }
+    }
+
+    /// <summary>Snapshot of the comm event log (oldest first).</summary>
+    public byte[] ReadEventLog()
+    {
+        lock (_sync)
+        {
+            return [.. _eventLog];
+        }
+    }
+
+    /// <summary>Clear the comm event log.</summary>
+    public void ClearEventLog()
+    {
+        lock (_sync)
+        {
+            _eventLog.Clear();
+        }
+    }
+
+    /// <summary>Reset counters and the diagnostic register (FC08 sub 0x000A).</summary>
+    public void ResetCounters()
+    {
+        lock (_sync)
+        {
+            _slaveMessageCount = 0;
+            _slaveExceptionCount = 0;
+            _noResponseCount = 0;
+            _busyCount = 0;
+            _eventCount = 0;
+            DiagnosticRegister = 0;
         }
     }
 

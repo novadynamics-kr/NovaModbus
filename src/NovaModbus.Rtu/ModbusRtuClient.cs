@@ -112,6 +112,118 @@ public sealed class ModbusRtuClient : IAsyncDisposable
         }
     }
 
+    /// <summary>Read exception status (FC07).</summary>
+    public async Task<byte> ReadExceptionStatusAsync(byte slaveId, CancellationToken cancellationToken = default)
+    {
+        byte[] body = await ExchangeAsync(
+            slaveId, ModbusFunction.ReadExceptionStatus, ExceptionStatusCodec.EncodeRequest(), cancellationToken).ConfigureAwait(false);
+        return ExceptionStatusCodec.DecodeResponse(body);
+    }
+
+    /// <summary>Diagnostics (FC08). Verifies the sub-function echo, returns the data part.</summary>
+    public async Task<byte[]> DiagnosticsAsync(byte slaveId, ushort subfunction, byte[] data, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(data);
+        byte[] body = await ExchangeAsync(
+            slaveId, ModbusFunction.Diagnostics, DiagnosticsCodec.Encode(subfunction, data), cancellationToken).ConfigureAwait(false);
+        DiagnosticsCodec.Decode(body, out ushort echoSub, out byte[] echoData);
+        if (echoSub != subfunction)
+        {
+            throw new InvalidOperationException("FC08 sub-function echo mismatch.");
+        }
+
+        return echoData;
+    }
+
+    /// <summary>Get comm event counter (FC0B).</summary>
+    public async Task<(ushort Status, ushort EventCount)> GetCommEventCounterAsync(byte slaveId, CancellationToken cancellationToken = default)
+    {
+        byte[] body = await ExchangeAsync(
+            slaveId, ModbusFunction.GetCommEventCounter, CommEventCounterCodec.EncodeRequest(), cancellationToken).ConfigureAwait(false);
+        CommEventCounterCodec.DecodeResponse(body, out ushort status, out ushort eventCount);
+        return (status, eventCount);
+    }
+
+    /// <summary>Get comm event log (FC0C).</summary>
+    public async Task<(ushort Status, ushort EventCount, ushort MessageCount, byte[] Events)> GetCommEventLogAsync(byte slaveId, CancellationToken cancellationToken = default)
+    {
+        byte[] body = await ExchangeAsync(
+            slaveId, ModbusFunction.GetCommEventLog, CommEventLogCodec.EncodeRequest(), cancellationToken).ConfigureAwait(false);
+        CommEventLogCodec.DecodeResponse(body, out ushort status, out ushort eventCount, out ushort messageCount, out byte[] events);
+        return (status, eventCount, messageCount, events);
+    }
+
+    /// <summary>Report server ID (FC11), assuming no additional data.</summary>
+    public async Task<(byte[] ServerId, bool Running)> ReportServerIdAsync(byte slaveId, CancellationToken cancellationToken = default)
+    {
+        byte[] body = await ExchangeAsync(
+            slaveId, ModbusFunction.ReportServerId, ServerIdCodec.EncodeRequest(), cancellationToken).ConfigureAwait(false);
+        ServerIdCodec.DecodeResponse(body, out byte[] serverId, out bool running);
+        return (serverId, running);
+    }
+
+    /// <summary>Report server ID (FC11) with a known server ID length, splitting additional data.</summary>
+    public async Task<(byte[] ServerId, bool Running, byte[] Additional)> ReportServerIdAsync(byte slaveId, int serverIdLength, CancellationToken cancellationToken = default)
+    {
+        byte[] body = await ExchangeAsync(
+            slaveId, ModbusFunction.ReportServerId, ServerIdCodec.EncodeRequest(), cancellationToken).ConfigureAwait(false);
+        ServerIdCodec.DecodeResponse(body, serverIdLength, out byte[] serverId, out bool running, out byte[] additional);
+        return (serverId, running, additional);
+    }
+
+    /// <summary>Read file records (FC14).</summary>
+    public async Task<ushort[][]> ReadFileRecordAsync(byte slaveId, FileSubRequest[] subs, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(subs);
+        byte[] body = await ExchangeAsync(
+            slaveId, ModbusFunction.ReadFileRecord, FileRecordCodec.EncodeReadRequest(subs), cancellationToken).ConfigureAwait(false);
+        return FileRecordCodec.DecodeReadResponse(body);
+    }
+
+    /// <summary>Write file records (FC15). Verifies the echoed sub-requests.</summary>
+    public async Task WriteFileRecordAsync(byte slaveId, FileSubRequest[] subs, ushort[][] datas, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(subs);
+        ArgumentNullException.ThrowIfNull(datas);
+        byte[] body = await ExchangeAsync(
+            slaveId, ModbusFunction.WriteFileRecord, FileRecordCodec.EncodeWriteRequest(subs, datas), cancellationToken).ConfigureAwait(false);
+        FileSubRequest[] echo = FileRecordCodec.DecodeWriteResponse(body);
+        if (!echo.SequenceEqual(subs))
+        {
+            throw new InvalidOperationException("FC15 echo mismatch.");
+        }
+    }
+
+    /// <summary>Mask write register (FC16). Verifies the echo.</summary>
+    public async Task MaskWriteRegisterAsync(byte slaveId, ushort address, ushort andMask, ushort orMask, CancellationToken cancellationToken = default)
+    {
+        byte[] request = MaskWriteCodec.Encode(address, andMask, orMask);
+        byte[] echo = await ExchangeAsync(slaveId, ModbusFunction.MaskWriteRegister, request, cancellationToken).ConfigureAwait(false);
+        MaskWriteCodec.Decode(echo, out ushort echoAddress, out ushort echoAnd, out ushort echoOr);
+        if (echoAddress != address || echoAnd != andMask || echoOr != orMask)
+        {
+            throw new InvalidOperationException("Mask-write echo mismatch.");
+        }
+    }
+
+    /// <summary>Read/write multiple registers (FC17).</summary>
+    public async Task<ushort[]> ReadWriteMultipleRegistersAsync(byte slaveId, ushort readStart, ushort readCount, ushort writeStart, ushort[] writeValues, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(writeValues);
+        byte[] body = await ExchangeAsync(
+            slaveId, ModbusFunction.ReadWriteMultipleRegisters,
+            ReadWriteMultipleCodec.EncodeRequest(readStart, readCount, writeStart, writeValues), cancellationToken).ConfigureAwait(false);
+        return ReadWriteMultipleCodec.DecodeResponse(body);
+    }
+
+    /// <summary>Read FIFO queue (FC18).</summary>
+    public async Task<ushort[]> ReadFifoQueueAsync(byte slaveId, ushort pointerAddress, CancellationToken cancellationToken = default)
+    {
+        byte[] body = await ExchangeAsync(
+            slaveId, ModbusFunction.ReadFifoQueue, FifoQueueCodec.EncodeRequest(pointerAddress), cancellationToken).ConfigureAwait(false);
+        return FifoQueueCodec.DecodeResponse(body);
+    }
+
     private Task<byte[]> ExchangeAsync(byte slaveId, ModbusFunction function, byte[] requestBody, CancellationToken cancellationToken) =>
         ModbusTransaction.ExchangeAsync(
             _transport, BaudRate, slaveId, (byte)function, requestBody,

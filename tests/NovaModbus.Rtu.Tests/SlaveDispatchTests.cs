@@ -129,8 +129,8 @@ public sealed class SlaveDispatchTests
     public void UnknownFunctionGivesIllegalFunction()
     {
         ModbusRtuSlave slave = CreateSlave();
-        byte[]? response = slave.HandleRequest(Request(1, 0x08, [0x00, 0x00]));
-        Assert.AreEqual(ModbusExceptionCode.IllegalFunction, DecodeException(response, 0x08));
+        byte[]? response = slave.HandleRequest(Request(1, 0x2B, [0x0E, 0x01, 0x00]));
+        Assert.AreEqual(ModbusExceptionCode.IllegalFunction, DecodeException(response, 0x2B));
     }
 
     [TestMethod]
