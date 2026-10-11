@@ -5,8 +5,54 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:NovaModbus.Client"
         mc:Ignorable="d"
-        Title="MainWindow" Height="450" Width="800">
+        Title="NovaModbus Client" Height="600" Width="900">
     <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="250"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
 
+        <GroupBox Grid.Column="0" Header="Serial Port" Margin="8"
+                  DataContext="{Binding SerialSettings}">
+            <StackPanel Margin="8">
+                <Label Content="COM Port"/>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <ComboBox Grid.Column="0"
+                              ItemsSource="{Binding AvailablePorts}"
+                              SelectedItem="{Binding SelectedPort}"/>
+                    <Button Grid.Column="1" Content="Refresh" Margin="4,0,0,0" Padding="8,0"
+                            Command="{Binding RefreshPortsCommand}"/>
+                </Grid>
+
+                <Label Content="Baud Rate" Margin="0,8,0,0"/>
+                <ComboBox IsEditable="True"
+                          ItemsSource="{Binding AvailableBaudRates}"
+                          Text="{Binding BaudRateText, UpdateSourceTrigger=PropertyChanged}"/>
+
+                <Label Content="Data Bits" Margin="0,8,0,0"/>
+                <ComboBox ItemsSource="{Binding AvailableDataBits}"
+                          SelectedItem="{Binding DataBits}"/>
+
+                <Label Content="Parity" Margin="0,8,0,0"/>
+                <ComboBox ItemsSource="{Binding AvailableParity}"
+                          SelectedItem="{Binding Parity}"/>
+
+                <Label Content="Stop Bits" Margin="0,8,0,0"/>
+                <ComboBox ItemsSource="{Binding AvailableStopBits}"
+                          SelectedItem="{Binding StopBits}"/>
+
+                <TextBlock Margin="0,12,0,0" Foreground="Gray" TextWrapping="Wrap"
+                           Text="{Binding StatusMessage}"/>
+            </StackPanel>
+        </GroupBox>
+
+        <Border Grid.Column="1" Margin="0,8,8,8" BorderBrush="LightGray" BorderThickness="1">
+            <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center"
+                       Foreground="Gray" Text="Main content — later phases"/>
+        </Border>
     </Grid>
 </Window>
