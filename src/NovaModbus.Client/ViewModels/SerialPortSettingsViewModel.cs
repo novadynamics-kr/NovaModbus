@@ -7,8 +7,13 @@ namespace NovaModbus.Client.ViewModels;
 /// <summary>Serial port settings panel (left side of the client window).</summary>
 public sealed class SerialPortSettingsViewModel : ViewModelBase
 {
+    /// <summary>Prefix marking virtual endpoints in the port list.</summary>
+    public const string VirtualPrefix = "VIRTUAL:";
+
     private static readonly string[] DefaultBaudRates =
         ["1200", "2400", "4800", "9600", "19200", "38400", "57600", "115200", "230400", "460800", "921600"];
+
+    private readonly VirtualSerialBus? _bus;
 
     private string? _selectedPort;
     private string _baudRateText = "9600";
@@ -17,9 +22,10 @@ public sealed class SerialPortSettingsViewModel : ViewModelBase
     private string _stopBits = "One";
     private string _statusMessage = string.Empty;
 
-    /// <summary>Initializes settings and loads the system port list.</summary>
-    public SerialPortSettingsViewModel()
+    /// <summary>Initializes settings and loads the port list (system + virtual).</summary>
+    public SerialPortSettingsViewModel(VirtualSerialBus? bus = null)
     {
+        _bus = bus;
         RefreshPortsCommand = new RelayCommand(RefreshPorts);
         RefreshPorts();
     }
@@ -39,12 +45,26 @@ public sealed class SerialPortSettingsViewModel : ViewModelBase
     /// <summary>Available stop-bit options (names match System.IO.Ports.StopBits).</summary>
     public ObservableCollection<string> AvailableStopBits { get; } = ["One", "OnePointFive", "Two"];
 
-    /// <summary>Selected COM port (null when none available).</summary>
+    /// <summary>Selected port (real COM name or VIRTUAL: prefix + endpoint).</summary>
     public string? SelectedPort
     {
         get => _selectedPort;
-        set => SetProperty(ref _selectedPort, value);
+        set
+        {
+            if (SetProperty(ref _selectedPort, value))
+            {
+                NotifyPropertyChanged(nameof(IsVirtualSelected));
+                NotifyPropertyChanged(nameof(VirtualEndpointName));
+            }
+        }
     }
+
+    /// <summary>Whether the selection is a virtual endpoint.</summary>
+    public bool IsVirtualSelected => SelectedPort?.StartsWith(VirtualPrefix, StringComparison.Ordinal) == true;
+
+    /// <summary>Virtual endpoint name, or null for real ports.</summary>
+    public string? VirtualEndpointName =>
+        IsVirtualSelected ? SelectedPort![VirtualPrefix.Length..] : null;
 
     /// <summary>Baud rate text (preset selection or custom input).</summary>
     public string BaudRateText
@@ -97,7 +117,7 @@ public sealed class SerialPortSettingsViewModel : ViewModelBase
     /// <summary>Reload the system port list.</summary>
     public RelayCommand RefreshPortsCommand { get; }
 
-    /// <summary>Reload the system port list, preserving the selection when possible.</summary>
+    /// <summary>Reload the port list (system ports + virtual endpoints).</summary>
     public void RefreshPorts()
     {
         string? keep = SelectedPort;
@@ -106,6 +126,14 @@ public sealed class SerialPortSettingsViewModel : ViewModelBase
         foreach (string name in names)
         {
             AvailablePorts.Add(name);
+        }
+
+        if (_bus is not null)
+        {
+            foreach (string endpoint in _bus.ListEndpoints())
+            {
+                AvailablePorts.Add(VirtualPrefix + endpoint);
+            }
         }
 
         SelectedPort = keep is not null && AvailablePorts.Contains(keep) ? keep

@@ -12,7 +12,13 @@
             <ColumnDefinition Width="*"/>
         </Grid.ColumnDefinitions>
 
-        <GroupBox Grid.Column="0" Header="Serial Port" Margin="8"
+        <Grid Grid.Column="0" Margin="8">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+        <GroupBox Grid.Row="0" Header="Serial Port"
                   DataContext="{Binding SerialSettings}">
             <StackPanel Margin="8">
                 <Label Content="COM Port"/>
@@ -49,6 +55,16 @@
                            Text="{Binding StatusMessage}"/>
             </StackPanel>
         </GroupBox>
+
+        <StackPanel Grid.Row="1" Margin="0,8,0,0">
+            <Button Content="Connect" Margin="0,0,0,4" Padding="0,4"
+                    Command="{Binding ConnectCommand}"/>
+            <Button Content="Disconnect" Padding="0,4"
+                    Command="{Binding DisconnectCommand}"/>
+            <TextBlock Margin="0,6,0,0" TextWrapping="Wrap"
+                       Text="{Binding StatusText}"/>
+        </StackPanel>
+        </Grid>
 
         <Border Grid.Column="1" Margin="0,8,8,8" BorderBrush="LightGray" BorderThickness="1">
             <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center"

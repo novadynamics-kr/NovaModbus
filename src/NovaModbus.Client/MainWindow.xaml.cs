@@ -11,5 +11,14 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         DataContext = new MainViewModel();
+        Closed += OnClosed;
+    }
+
+    private async void OnClosed(object? sender, EventArgs e)
+    {
+        if (DataContext is IAsyncDisposable disposable)
+        {
+            await disposable.DisposeAsync().ConfigureAwait(true);
+        }
     }
 }
