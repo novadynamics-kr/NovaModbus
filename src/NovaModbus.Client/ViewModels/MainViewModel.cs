@@ -20,6 +20,7 @@ public sealed class MainViewModel : ViewModelBase, IAsyncDisposable
     public MainViewModel()
     {
         SerialSettings = new SerialPortSettingsViewModel(_bus);
+        ReadWrite = new ReadWriteViewModel(() => Connection.Client);
 
         var (held, published) = VirtualTransport.CreatePair();
         _bus.Publish(TestSlaveEndpoint, published);
@@ -36,6 +37,9 @@ public sealed class MainViewModel : ViewModelBase, IAsyncDisposable
 
     /// <summary>Serial port settings (left panel).</summary>
     public SerialPortSettingsViewModel SerialSettings { get; }
+
+    /// <summary>Single-shot function execution tab.</summary>
+    public ReadWriteViewModel ReadWrite { get; }
 
     /// <summary>Active connection (serial or virtual).</summary>
     public ModbusConnection Connection { get; } = new();

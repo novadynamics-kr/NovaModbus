@@ -66,9 +66,50 @@
         </StackPanel>
         </Grid>
 
-        <Border Grid.Column="1" Margin="0,8,8,8" BorderBrush="LightGray" BorderThickness="1">
-            <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center"
-                       Foreground="Gray" Text="Main content — later phases"/>
-        </Border>
+        <TabControl Grid.Column="1" Margin="0,8,8,8" DataContext="{Binding ReadWrite}">
+            <TabItem Header="Read / Write">
+                <Grid Margin="8">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <StackPanel Grid.Row="0" Orientation="Horizontal">
+                        <StackPanel Margin="0,0,8,0">
+                            <Label Content="Function"/>
+                            <ComboBox Width="180" ItemsSource="{Binding AvailableFunctions}"
+                                      SelectedItem="{Binding SelectedFunction}"/>
+                        </StackPanel>
+                        <StackPanel Margin="0,0,8,0">
+                            <Label Content="Slave ID"/>
+                            <TextBox Width="70" Text="{Binding SlaveIdText, UpdateSourceTrigger=PropertyChanged}"/>
+                        </StackPanel>
+                        <StackPanel Margin="0,0,8,0">
+                            <Label Content="Start"/>
+                            <TextBox Width="80" Text="{Binding StartText, UpdateSourceTrigger=PropertyChanged}"/>
+                        </StackPanel>
+                        <StackPanel Margin="0,0,8,0" IsEnabled="{Binding NeedsCount}">
+                            <Label Content="Count"/>
+                            <TextBox Width="80" Text="{Binding CountText, UpdateSourceTrigger=PropertyChanged}"/>
+                        </StackPanel>
+                        <StackPanel VerticalAlignment="Bottom">
+                            <Button Content="Execute" Padding="16,2" Margin="0,0,0,1"
+                                    Command="{Binding ExecuteCommand}"/>
+                        </StackPanel>
+                    </StackPanel>
+
+                    <StackPanel Grid.Row="1" Margin="0,8,0,0" IsEnabled="{Binding NeedsValues}">
+                        <Label Content="Values (coils: 1,0,1 or 101 / regs: 10, 0x12, 255)"/>
+                        <TextBox Text="{Binding ValuesText, UpdateSourceTrigger=PropertyChanged}"/>
+                    </StackPanel>
+
+                    <TextBox Grid.Row="2" Margin="0,8,0,0" IsReadOnly="True"
+                             FontFamily="Consolas" AcceptsReturn="True"
+                             VerticalScrollBarVisibility="Auto"
+                             Text="{Binding ResultText, Mode=OneWay}"/>
+                </Grid>
+            </TabItem>
+        </TabControl>
     </Grid>
 </Window>
