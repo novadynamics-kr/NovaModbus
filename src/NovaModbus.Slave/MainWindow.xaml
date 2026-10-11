@@ -5,8 +5,125 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:NovaModbus.Slave"
         mc:Ignorable="d"
-        Title="MainWindow" Height="450" Width="800">
+        Title="NovaModbus Slave" Height="600" Width="900">
     <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="250"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
 
+        <Grid Grid.Column="0" Margin="8">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <GroupBox Grid.Row="0" Header="Serial Port"
+                      DataContext="{Binding SerialSettings}">
+                <StackPanel Margin="8">
+                    <Label Content="COM Port"/>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <ComboBox Grid.Column="0"
+                                  ItemsSource="{Binding AvailablePorts}"
+                                  SelectedItem="{Binding SelectedPort}"/>
+                        <Button Grid.Column="1" Content="Refresh" Margin="4,0,0,0" Padding="8,0"
+                                Command="{Binding RefreshPortsCommand}"/>
+                    </Grid>
+
+                    <Label Content="Baud Rate" Margin="0,8,0,0"/>
+                    <ComboBox IsEditable="True"
+                              ItemsSource="{Binding AvailableBaudRates}"
+                              Text="{Binding BaudRateText, UpdateSourceTrigger=PropertyChanged}"/>
+
+                    <Label Content="Data Bits" Margin="0,8,0,0"/>
+                    <ComboBox ItemsSource="{Binding AvailableDataBits}"
+                              SelectedItem="{Binding DataBits}"/>
+
+                    <Label Content="Parity" Margin="0,8,0,0"/>
+                    <ComboBox ItemsSource="{Binding AvailableParity}"
+                              SelectedItem="{Binding Parity}"/>
+
+                    <Label Content="Stop Bits" Margin="0,8,0,0"/>
+                    <ComboBox ItemsSource="{Binding AvailableStopBits}"
+                              SelectedItem="{Binding StopBits}"/>
+
+                    <TextBlock Margin="0,12,0,0" Foreground="Gray" TextWrapping="Wrap"
+                               Text="{Binding StatusMessage}"/>
+                </StackPanel>
+            </GroupBox>
+
+            <StackPanel Grid.Row="1" Margin="0,8,0,0">
+                <Button Content="Start" Margin="0,0,0,4" Padding="0,4"
+                        Command="{Binding StartCommand}"/>
+                <Button Content="Stop" Padding="0,4"
+                        Command="{Binding StopCommand}"/>
+                <TextBlock Margin="0,6,0,0" TextWrapping="Wrap"
+                           Text="{Binding StatusText}"/>
+            </StackPanel>
+
+            <GroupBox Grid.Row="2" Header="Slave IDs" Margin="0,8,0,0">
+                <StackPanel Margin="8">
+                    <ListBox Height="80" ItemsSource="{Binding SlaveIds}"
+                             SelectedItem="{Binding SelectedSlaveId}"/>
+                    <Grid Margin="0,4,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBox Grid.Column="0" Margin="0,0,4,0"
+                                 Text="{Binding NewSlaveIdText, UpdateSourceTrigger=PropertyChanged}"/>
+                        <Button Grid.Column="1" Content="Add" Padding="8,0" Margin="0,0,4,0"
+                                Command="{Binding AddSlaveCommand}"/>
+                        <Button Grid.Column="2" Content="Del" Padding="8,0"
+                                Command="{Binding RemoveSlaveCommand}"/>
+                    </Grid>
+                </StackPanel>
+            </GroupBox>
+
+            <GroupBox Grid.Row="3" Header="Error Injection" Margin="0,8,0,0">
+                <StackPanel Margin="8">
+                    <CheckBox Content="Ignore CRC errors" Margin="0,0,0,4"
+                              IsChecked="{Binding IgnoreCrcErrors}"/>
+                    <CheckBox Content="Simulate busy" IsChecked="{Binding SimulateBusy}"/>
+                </StackPanel>
+            </GroupBox>
+        </Grid>
+
+        <TabControl Grid.Column="1" Margin="0,8,8,8">
+            <TabItem Header="Holding">
+                <DataGrid Margin="8" AutoGenerateColumns="False" IsReadOnly="False"
+                          ItemsSource="{Binding HoldingRows}">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="Address" Binding="{Binding Address, Mode=OneWay}" IsReadOnly="True"/>
+                        <DataGridTextColumn Header="Value" Binding="{Binding ValueText, UpdateSourceTrigger=LostFocus}" Width="*"/>
+                    </DataGrid.Columns>
+                </DataGrid>
+            </TabItem>
+            <TabItem Header="Coils">
+                <DataGrid Margin="8" AutoGenerateColumns="False"
+                          ItemsSource="{Binding CoilRows}">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="Address" Binding="{Binding Address, Mode=OneWay}" IsReadOnly="True"/>
+                        <DataGridCheckBoxColumn Header="On" Binding="{Binding IsOn, UpdateSourceTrigger=PropertyChanged}" Width="*"/>
+                    </DataGrid.Columns>
+                </DataGrid>
+            </TabItem>
+            <TabItem Header="Counters">
+                <TextBox Margin="8" IsReadOnly="True" FontFamily="Consolas"
+                         AcceptsReturn="True" VerticalScrollBarVisibility="Auto"
+                         Text="{Binding CountersText, Mode=OneWay}"/>
+            </TabItem>
+            <TabItem Header="Log" DataContext="{Binding CommLog}">
+                <ListBox Margin="8" FontFamily="Consolas"
+                         ItemsSource="{Binding Lines}"/>
+            </TabItem>
+        </TabControl>
     </Grid>
 </Window>
