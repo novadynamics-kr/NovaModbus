@@ -532,9 +532,10 @@ public sealed class WatchViewModel : ViewModelBase, IDisposable
         try
         {
             using PeriodicTimer timer = new(_autoInterval);
-            while (await timer.WaitForNextTickAsync(ct).ConfigureAwait(false))
+            // Intentionally UI-affine (no ConfigureAwait(false)): Results is bound.
+            while (await timer.WaitForNextTickAsync(ct))
             {
-                await ReadAllAsync(ct).ConfigureAwait(false);
+                await ReadAllAsync(ct);
             }
         }
         catch (OperationCanceledException)
@@ -621,7 +622,9 @@ public sealed class WatchViewModel : ViewModelBase, IDisposable
                 }
 
                 return batch;
-            }, cancellationToken).ConfigureAwait(false);
+            }, cancellationToken);
+            // Intentionally UI-affine below (no ConfigureAwait(false)):
+            // bound Entries/Results must mutate on the UI thread.
 
             foreach (WatchEntry entry in fresh)
             {
