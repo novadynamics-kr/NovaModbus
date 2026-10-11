@@ -33,7 +33,7 @@ Issue: #6
 
 ## Unresolved / Follow-ups
 
-1. 2B/MEI Device Identification (별도 Task).
+1. ~~2B/MEI Device Identification (별도 Task)~~ — 제외 확정 (2026-10-11, 불필요).
 2. Client Read/Write·Watch 탭에 신 FC 노출 (후속 UI Task).
 3. 실물 COM 검증 (하드웨어 단계).
 
