@@ -18,7 +18,13 @@ public abstract class ViewModelBase : INotifyPropertyChanged
         }
 
         field = value;
-        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        NotifyPropertyChanged(propertyName);
         return true;
+    }
+
+    /// <summary>Raise PropertyChanged for a dependent property.</summary>
+    protected void NotifyPropertyChanged([CallerMemberName] string? propertyName = null)
+    {
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
     }
 }
