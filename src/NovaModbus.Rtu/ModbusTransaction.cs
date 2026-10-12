@@ -50,7 +50,7 @@ public static class ModbusTransaction
                 }
 
                 byte[]? raw = await RtuFramer.ReadFrameAsync(
-                    transport, baudRate, remaining, silentIntervalOverride, cancellationToken).ConfigureAwait(false);
+                    transport, baudRate, remaining, silentIntervalOverride, null, cancellationToken).ConfigureAwait(false);
                 if (raw is null)
                 {
                     break;

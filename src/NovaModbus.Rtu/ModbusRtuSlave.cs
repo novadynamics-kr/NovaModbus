@@ -94,7 +94,7 @@ public sealed class ModbusRtuSlave : IAsyncDisposable
     public async Task<bool> ServeOnceAsync(TimeSpan? silentIntervalOverride = null, CancellationToken cancellationToken = default)
     {
         byte[]? raw = await RtuFramer.ReadFrameAsync(
-            _transport, BaudRate, Timeout, silentIntervalOverride, cancellationToken).ConfigureAwait(false);
+            _transport, BaudRate, Timeout, silentIntervalOverride, null, cancellationToken).ConfigureAwait(false);
         if (raw is null)
         {
             return false;
