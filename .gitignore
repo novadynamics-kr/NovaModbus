@@ -11,3 +11,4 @@
 /src/NovaModbus.Slave/obj
 /tests/NovaModbus.Rtu.Tests/bin
 /tests/NovaModbus.Rtu.Tests/obj
+**/TestResults

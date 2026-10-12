@@ -48,6 +48,15 @@ dotnet run --project src/NovaModbus.Slave -c Debug
 dotnet test tests/NovaModbus.Rtu.Tests --filter "FullyQualifiedName~Crc16"
 ```
 
+커버리지 수집 (`Microsoft.CodeCoverage`, 테스트 프로젝트 한정):
+
+```powershell
+dotnet test NovaModbus.slnx -c Release --collect:"Code Coverage"
+```
+
+결과 `.coverage` 파일은 `tests/NovaModbus.Rtu.Tests/TestResults/`에 생성되며
+Visual Studio (2026) 에서 열어 확인한다. 수집물은 커밋하지 않는다.
+
 실물 COM포트 테스트는 `[TestCategory("Hardware")]`로 분리, 기본 제외.
 
 ## 라이브러리 사용법
