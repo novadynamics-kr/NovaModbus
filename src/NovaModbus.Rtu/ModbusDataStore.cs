@@ -22,6 +22,10 @@ public sealed class ModbusDataStore
     private int _eventCount;
 
     /// <summary>Initializes a store with the given capacities (defaults cover 0x0000-0xFFFF).</summary>
+    /// <param name="coilCount">Coil capacity (must be positive).</param>
+    /// <param name="discreteCount">Discrete-input capacity (must be positive).</param>
+    /// <param name="holdingCount">Holding-register capacity (must be positive).</param>
+    /// <param name="inputCount">Input-register capacity (must be positive).</param>
     public ModbusDataStore(
         int coilCount = ModbusLimits.MaxAddress + 1,
         int discreteCount = ModbusLimits.MaxAddress + 1,
@@ -51,6 +55,10 @@ public sealed class ModbusDataStore
     public int InputCount => _inputRegisters.Length;
 
     /// <summary>Read holding registers (bounds checked).</summary>
+    /// <param name="start">Zero-based start address.</param>
+    /// <param name="count">Registers to read.</param>
+    /// <returns>Register values in address order.</returns>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown when the range exceeds capacity.</exception>
     public ushort[] ReadHolding(ushort start, ushort count)
     {
         lock (_sync)
@@ -61,6 +69,9 @@ public sealed class ModbusDataStore
     }
 
     /// <summary>Write holding registers (bounds checked).</summary>
+    /// <param name="start">Zero-based start address.</param>
+    /// <param name="values">Values to store in address order.</param>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown when the range exceeds capacity.</exception>
     public void WriteHolding(ushort start, ReadOnlySpan<ushort> values)
     {
         lock (_sync)
@@ -71,6 +82,9 @@ public sealed class ModbusDataStore
     }
 
     /// <summary>Write single holding register (bounds checked).</summary>
+    /// <param name="address">Zero-based address.</param>
+    /// <param name="value">Value to store.</param>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown when the address exceeds capacity.</exception>
     public void WriteHolding(ushort address, ushort value)
     {
         lock (_sync)
@@ -81,6 +95,10 @@ public sealed class ModbusDataStore
     }
 
     /// <summary>Read input registers (bounds checked).</summary>
+    /// <param name="start">Zero-based start address.</param>
+    /// <param name="count">Registers to read.</param>
+    /// <returns>Register values in address order.</returns>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown when the range exceeds capacity.</exception>
     public ushort[] ReadInput(ushort start, ushort count)
     {
         lock (_sync)
@@ -91,6 +109,9 @@ public sealed class ModbusDataStore
     }
 
     /// <summary>Seed input registers (simulator side, bounds checked).</summary>
+    /// <param name="start">Zero-based start address.</param>
+    /// <param name="values">Values to store in address order.</param>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown when the range exceeds capacity.</exception>
     public void WriteInput(ushort start, ReadOnlySpan<ushort> values)
     {
         lock (_sync)
@@ -101,6 +122,10 @@ public sealed class ModbusDataStore
     }
 
     /// <summary>Read coils (bounds checked).</summary>
+    /// <param name="start">Zero-based start address.</param>
+    /// <param name="count">Coils to read.</param>
+    /// <returns>Coil states in address order.</returns>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown when the range exceeds capacity.</exception>
     public bool[] ReadCoils(ushort start, ushort count)
     {
         lock (_sync)
@@ -111,6 +136,9 @@ public sealed class ModbusDataStore
     }
 
     /// <summary>Write single coil (bounds checked).</summary>
+    /// <param name="address">Zero-based address.</param>
+    /// <param name="value">State to store.</param>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown when the address exceeds capacity.</exception>
     public void WriteCoil(ushort address, bool value)
     {
         lock (_sync)
@@ -121,6 +149,9 @@ public sealed class ModbusDataStore
     }
 
     /// <summary>Write a run of coils (bounds checked).</summary>
+    /// <param name="start">Zero-based start address.</param>
+    /// <param name="values">States to store in address order.</param>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown when the range exceeds capacity.</exception>
     public void WriteCoils(ushort start, ReadOnlySpan<bool> values)
     {
         lock (_sync)
@@ -134,6 +165,10 @@ public sealed class ModbusDataStore
     }
 
     /// <summary>Read discrete inputs (bounds checked).</summary>
+    /// <param name="start">Zero-based start address.</param>
+    /// <param name="count">Inputs to read.</param>
+    /// <returns>Input states in address order.</returns>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown when the range exceeds capacity.</exception>
     public bool[] ReadDiscrete(ushort start, ushort count)
     {
         lock (_sync)
@@ -144,6 +179,9 @@ public sealed class ModbusDataStore
     }
 
     /// <summary>Seed discrete inputs (simulator side, bounds checked).</summary>
+    /// <param name="start">Zero-based start address.</param>
+    /// <param name="values">States to store in address order.</param>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown when the range exceeds capacity.</exception>
     public void WriteDiscrete(ushort start, ReadOnlySpan<bool> values)
     {
         lock (_sync)
@@ -169,6 +207,7 @@ public sealed class ModbusDataStore
     public string ServerIdentity { get; set; } = "NovaModbus";
 
     /// <summary>Gets a copy of the FC11 additional data.</summary>
+    /// <returns>Copy of the additional identity bytes.</returns>
     public byte[] GetAdditionalData()
     {
         lock (_sync)
@@ -178,6 +217,7 @@ public sealed class ModbusDataStore
     }
 
     /// <summary>Sets the FC11 additional data.</summary>
+    /// <param name="data">Identity bytes to store (copied).</param>
     public void SetAdditionalData(byte[] data)
     {
         ArgumentNullException.ThrowIfNull(data);
@@ -188,6 +228,8 @@ public sealed class ModbusDataStore
     }
 
     /// <summary>Creates or resizes a file record area (simulator setup).</summary>
+    /// <param name="fileNumber">File number to create.</param>
+    /// <param name="recordCapacity">Register capacity (must be positive).</param>
     public void EnsureFile(ushort fileNumber, int recordCapacity)
     {
         ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(recordCapacity, 0);
@@ -198,6 +240,8 @@ public sealed class ModbusDataStore
     }
 
     /// <summary>Whether a file record area exists.</summary>
+    /// <param name="fileNumber">File number to look up.</param>
+    /// <returns>True when the file area was created via <see cref="EnsureFile"/>.</returns>
     public bool FileExists(ushort fileNumber)
     {
         lock (_sync)
@@ -207,6 +251,11 @@ public sealed class ModbusDataStore
     }
 
     /// <summary>Read file records (bounds checked).</summary>
+    /// <param name="fileNumber">File number (must exist).</param>
+    /// <param name="recordNumber">Zero-based start record.</param>
+    /// <param name="length">Registers to read.</param>
+    /// <returns>Record values in order.</returns>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown for unknown files or out-of-range spans.</exception>
     public ushort[] ReadFileRecord(ushort fileNumber, ushort recordNumber, ushort length)
     {
         lock (_sync)
@@ -222,6 +271,10 @@ public sealed class ModbusDataStore
     }
 
     /// <summary>Write file records (bounds checked).</summary>
+    /// <param name="fileNumber">File number (must exist).</param>
+    /// <param name="recordNumber">Zero-based start record.</param>
+    /// <param name="values">Values to store in order.</param>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown for unknown files or out-of-range spans.</exception>
     public void WriteFileRecord(ushort fileNumber, ushort recordNumber, ReadOnlySpan<ushort> values)
     {
         lock (_sync)
@@ -237,6 +290,7 @@ public sealed class ModbusDataStore
     }
 
     /// <summary>Creates an empty FIFO queue (simulator setup).</summary>
+    /// <param name="pointerAddress">Pointer address identifying the queue.</param>
     public void EnsureFifo(ushort pointerAddress)
     {
         lock (_sync)
@@ -246,6 +300,8 @@ public sealed class ModbusDataStore
     }
 
     /// <summary>Whether a FIFO queue exists.</summary>
+    /// <param name="pointerAddress">Pointer address to look up.</param>
+    /// <returns>True when the queue was created via <see cref="EnsureFifo"/>.</returns>
     public bool FifoExists(ushort pointerAddress)
     {
         lock (_sync)
@@ -255,6 +311,9 @@ public sealed class ModbusDataStore
     }
 
     /// <summary>Append a value to a FIFO queue (simulator side).</summary>
+    /// <param name="pointerAddress">Pointer address identifying the queue.</param>
+    /// <param name="value">Value to enqueue.</param>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown for unknown pointers.</exception>
     public void EnqueueFifo(ushort pointerAddress, ushort value)
     {
         lock (_sync)
@@ -269,6 +328,9 @@ public sealed class ModbusDataStore
     }
 
     /// <summary>Non-destructive snapshot of a FIFO queue.</summary>
+    /// <param name="pointerAddress">Pointer address identifying the queue.</param>
+    /// <returns>Queued values oldest-first; the queue is unchanged.</returns>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown for unknown pointers.</exception>
     public ushort[] PeekFifo(ushort pointerAddress)
     {
         lock (_sync)
@@ -301,25 +363,32 @@ public sealed class ModbusDataStore
     public int EventCount => Volatile.Read(ref _eventCount);
 
     /// <summary>Record a served request.</summary>
+    /// <remarks>Thread-safe; backs the FC08 sub 0x0E counter.</remarks>
     public void NoteSlaveMessage() => Interlocked.Increment(ref _slaveMessageCount);
 
     /// <summary>Record an exception response.</summary>
+    /// <remarks>Thread-safe; backs the FC08 sub 0x0D counter.</remarks>
     public void NoteSlaveException() => Interlocked.Increment(ref _slaveExceptionCount);
 
     /// <summary>Record an addressed-but-unanswered request.</summary>
+    /// <remarks>Thread-safe; backs the FC08 sub 0x0F counter.</remarks>
     public void NoteNoResponse() => Interlocked.Increment(ref _noResponseCount);
 
     /// <summary>Record a busy response.</summary>
+    /// <remarks>Thread-safe; backs the FC08 sub 0x11 counter.</remarks>
     public void NoteBusy() => Interlocked.Increment(ref _busyCount);
 
     /// <summary>Record a NAK response.</summary>
+    /// <remarks>Thread-safe; backs the FC08 sub 0x10 counter.</remarks>
     public void NoteNak() => Interlocked.Increment(ref _nakCount);
 
     /// <summary>Record a comm event and append a log byte.</summary>
+    /// <param name="eventByte">Event byte to append (counter unchanged).</param>
     [Obsolete("Use NoteReceiveEvent/NoteSendEvent plus NoteEventCount (spec §6.10 semantics).")]
     public void NoteEvent(byte eventByte) => NoteReceiveEvent(eventByte);
 
     /// <summary>Append a receive-event byte (no counter change).</summary>
+    /// <param name="eventByte">Event byte per spec §6.10 layout (bit 7 set).</param>
     public void NoteReceiveEvent(byte eventByte)
     {
         lock (_sync)
@@ -329,6 +398,7 @@ public sealed class ModbusDataStore
     }
 
     /// <summary>Append a send-event byte (no counter change).</summary>
+    /// <param name="eventByte">Event byte per spec §6.10 layout (bit 7 clear, bit 6 set).</param>
     public void NoteSendEvent(byte eventByte)
     {
         lock (_sync)
@@ -355,6 +425,8 @@ public sealed class ModbusDataStore
         }
     }
 
+    /// <summary>Append a log byte, evicting the oldest beyond 64 entries.</summary>
+    /// <param name="eventByte">Event byte to append.</param>
     private void AppendEvent(byte eventByte)
     {
         _eventLog.Enqueue(eventByte);
@@ -365,6 +437,7 @@ public sealed class ModbusDataStore
     }
 
     /// <summary>Snapshot of the comm event log (newest first, per spec §6.10).</summary>
+    /// <returns>Event bytes, most recent first, at most 64.</returns>
     public byte[] ReadEventLog()
     {
         lock (_sync)
@@ -397,6 +470,11 @@ public sealed class ModbusDataStore
         }
     }
 
+    /// <summary>Validate an address span against a capacity.</summary>
+    /// <param name="start">Zero-based start index.</param>
+    /// <param name="count">Item count.</param>
+    /// <param name="length">Exclusive capacity bound.</param>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown for negative inputs or spans past <paramref name="length"/>.</exception>
     private static void CheckRange(int start, int count, int length)
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(start, 0);

@@ -12,6 +12,9 @@ public static class WriteSingleCoilCodec
     public const ushort OffValue = 0x0000;
 
     /// <summary>Encode body: [address BE(2)][0xFF00|0x0000 BE(2)].</summary>
+    /// <param name="address">Zero-based coil address (0..65535).</param>
+    /// <param name="on">True to switch the coil on (encodes 0xFF00), false to switch it off (encodes 0x0000).</param>
+    /// <returns>4-byte body shared by the FC05 request and response echo.</returns>
     public static byte[] Encode(ushort address, bool on)
     {
         byte[] body = new byte[4];
@@ -21,6 +24,10 @@ public static class WriteSingleCoilCodec
     }
 
     /// <summary>Decode body into address/value. Rejects values other than FF00/0000.</summary>
+    /// <param name="body">4-byte body holding the big-endian coil address and the 0xFF00/0x0000 value.</param>
+    /// <param name="address">Receives the decoded zero-based coil address.</param>
+    /// <param name="on">Receives true for 0xFF00 (on) or false for 0x0000 (off).</param>
+    /// <exception cref="ArgumentException">Thrown when <paramref name="body"/> is not 4 bytes long or the value is neither 0xFF00 nor 0x0000.</exception>
     public static void Decode(ReadOnlySpan<byte> body, out ushort address, out bool on)
     {
         if (body.Length != 4)

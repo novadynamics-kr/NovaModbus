@@ -15,6 +15,10 @@ public static class FileRecordCodec
     private const int SubRequestSize = 7;
 
     /// <summary>Encode an FC14 request: [byte count(1)][7-byte sub-requests...].</summary>
+    /// <param name="subs">Sub-requests to encode (1-35 entries; each record number 0x0000-0x270F, length 1-125 registers).</param>
+    /// <returns>The encoded request body with a leading byte count.</returns>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="subs"/> is <c>null</c>.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown when the sub-request count is out of range or a sub-request fails validation.</exception>
     public static byte[] EncodeReadRequest(IReadOnlyList<FileSubRequest> subs)
     {
         ArgumentNullException.ThrowIfNull(subs);
@@ -31,6 +35,10 @@ public static class FileRecordCodec
     }
 
     /// <summary>Decode an FC14 request into sub-requests.</summary>
+    /// <param name="body">Request body; [byte count(1)][7-byte sub-requests...] with the count matching the trailing length.</param>
+    /// <returns>The decoded sub-requests.</returns>
+    /// <exception cref="ArgumentException">Thrown when the byte count mismatches or a reference type is not 6.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown when the sub-request count or a decoded sub-request is out of range.</exception>
     public static FileSubRequest[] DecodeReadRequest(ReadOnlySpan<byte> body)
     {
         FileSubRequest[] subs = DecodeSubs(body);
@@ -43,6 +51,10 @@ public static class FileRecordCodec
     }
 
     /// <summary>Encode an FC14 response: [byte count(1)]([data length(1)][data...] per record).</summary>
+    /// <param name="records">Per-record register arrays (1-35 records; each 1-125 registers); total must fit the 253-byte PDU cap.</param>
+    /// <returns>The encoded response body with a leading byte count.</returns>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="records"/> is <c>null</c>.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown when the record count, a record length, or the total size is out of range.</exception>
     public static byte[] EncodeReadResponse(IReadOnlyList<ushort[]> records)
     {
         ArgumentNullException.ThrowIfNull(records);
@@ -71,6 +83,10 @@ public static class FileRecordCodec
     }
 
     /// <summary>Decode an FC14 response into per-record register arrays.</summary>
+    /// <param name="body">Response body; [byte count(1)]([data length(1)][big-endian registers...]) with the count matching the trailing length.</param>
+    /// <returns>One register array per record.</returns>
+    /// <exception cref="ArgumentException">Thrown when the byte count mismatches or a record length is odd/truncated.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown when a record length or the record count is out of range.</exception>
     public static ushort[][] DecodeReadResponse(ReadOnlySpan<byte> body)
     {
         if (body.Length < 1 || body[0] != body.Length - 1)
@@ -104,6 +120,12 @@ public static class FileRecordCodec
     }
 
     /// <summary>Encode an FC15 request: [byte count(1)]([7-byte sub][data length(1)][data...] per item).</summary>
+    /// <param name="subs">Sub-requests (1-35 entries; each record number 0x0000-0x270F).</param>
+    /// <param name="datas">Per-item register data; must have the same count as <paramref name="subs"/>, each 1-120 registers matching its sub-request length. Total must fit the 253-byte PDU cap.</param>
+    /// <returns>The encoded request body with a leading byte count.</returns>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="subs"/> or <paramref name="datas"/> is <c>null</c>.</exception>
+    /// <exception cref="ArgumentException">Thrown when the counts differ or a sub-request length mismatches its data length.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown when the item count, a data length, or the total size is out of range.</exception>
     public static byte[] EncodeWriteRequest(IReadOnlyList<FileSubRequest> subs, IReadOnlyList<ushort[]> datas)
     {
         ArgumentNullException.ThrowIfNull(subs);
@@ -145,6 +167,11 @@ public static class FileRecordCodec
     }
 
     /// <summary>Decode an FC15 request into sub-requests and per-item data.</summary>
+    /// <param name="body">Request body; [byte count(1)]([7-byte sub][data length(1)][big-endian registers...]) with the count matching the trailing length.</param>
+    /// <param name="subs">Receives the decoded sub-requests.</param>
+    /// <param name="datas">Receives the per-item register arrays.</param>
+    /// <exception cref="ArgumentException">Thrown when the byte count mismatches, a sub-request is truncated, a reference type is not 6, a data length is odd/truncated, or a length mismatches its data.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown when a decoded value is out of range or the item count is out of range.</exception>
     public static void DecodeWriteRequest(ReadOnlySpan<byte> body, out FileSubRequest[] subs, out ushort[][] datas)
     {
         if (body.Length < 1 || body[0] != body.Length - 1)
@@ -188,6 +215,10 @@ public static class FileRecordCodec
     }
 
     /// <summary>Encode an FC15 response (echo of the sub-request section).</summary>
+    /// <param name="subs">Sub-requests to echo (1-35 entries).</param>
+    /// <returns>The encoded response body: [byte count(1)][7-byte sub-requests...].</returns>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="subs"/> is <c>null</c>.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown when the sub-request count is out of range.</exception>
     public static byte[] EncodeWriteResponse(IReadOnlyList<FileSubRequest> subs)
     {
         ArgumentNullException.ThrowIfNull(subs);
@@ -203,8 +234,15 @@ public static class FileRecordCodec
     }
 
     /// <summary>Decode an FC15 response into the echoed sub-requests.</summary>
+    /// <param name="body">Response body; [byte count(1)][7-byte sub-requests...] with the count matching the trailing length.</param>
+    /// <returns>The echoed sub-requests.</returns>
+    /// <exception cref="ArgumentException">Thrown when the byte count mismatches or a reference type is not 6.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown when the sub-request count is out of range.</exception>
     public static FileSubRequest[] DecodeWriteResponse(ReadOnlySpan<byte> body) => DecodeSubs(body);
 
+    /// <summary>Decode a sub-request section into its entries.</summary>
+    /// <param name="body">Section body; [byte count(1)][7-byte sub-requests...] with the count matching the trailing length.</param>
+    /// <returns>The decoded sub-requests.</returns>
     private static FileSubRequest[] DecodeSubs(ReadOnlySpan<byte> body)
     {
         if (body.Length < 1 + SubRequestSize || body[0] != body.Length - 1 || ((body.Length - 1) % SubRequestSize) != 0)
@@ -223,6 +261,9 @@ public static class FileRecordCodec
         return subs;
     }
 
+    /// <summary>Write one 7-byte sub-request entry.</summary>
+    /// <param name="destination">Destination span; must hold at least 7 bytes: [reference type(1)][file BE(2)][record BE(2)][length BE(2)].</param>
+    /// <param name="sub">The sub-request to write.</param>
     private static void WriteSub(Span<byte> destination, FileSubRequest sub)
     {
         destination[0] = ReferenceType;
@@ -231,6 +272,9 @@ public static class FileRecordCodec
         BinaryPrimitives.WriteUInt16BigEndian(destination.Slice(5, 2), sub.Length);
     }
 
+    /// <summary>Read one 7-byte sub-request entry.</summary>
+    /// <param name="source">Source span; first byte must be reference type 6, followed by file, record, and length fields.</param>
+    /// <returns>The decoded sub-request.</returns>
     private static FileSubRequest ReadSub(ReadOnlySpan<byte> source)
     {
         if (source[0] != ReferenceType)
@@ -244,24 +288,33 @@ public static class FileRecordCodec
             BinaryPrimitives.ReadUInt16BigEndian(source.Slice(5, 2)));
     }
 
+    /// <summary>Validate the sub-request or record count.</summary>
+    /// <param name="count">Item count; valid range is 1-35.</param>
     private static void ValidateSubCount(int count)
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(count, 1);
         ArgumentOutOfRangeException.ThrowIfGreaterThan(count, ModbusLimits.MaxFileSubRequests);
     }
 
+    /// <summary>Validate a read sub-request.</summary>
+    /// <param name="sub">Sub-request to validate; record number 0x0000-0x270F, length 1-125 registers.</param>
     private static void ValidateReadSub(FileSubRequest sub)
     {
         ArgumentOutOfRangeException.ThrowIfGreaterThan(sub.RecordNumber, (ushort)ModbusLimits.MaxFileRecordNumber);
         ValidateReadLength(sub.Length);
     }
 
+    /// <summary>Validate a read transfer length.</summary>
+    /// <param name="length">Register count; valid range is 1-125.</param>
     private static void ValidateReadLength(int length)
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(length, 1);
         ArgumentOutOfRangeException.ThrowIfGreaterThan(length, ModbusLimits.MaxFileReadLength);
     }
 
+    /// <summary>Validate a write sub-request against its data.</summary>
+    /// <param name="sub">Sub-request to validate; record number 0x0000-0x270F, length must equal <paramref name="data"/> length.</param>
+    /// <param name="data">Register data; valid length is 1-120 registers.</param>
     private static void ValidateWriteSub(FileSubRequest sub, ushort[] data)
     {
         ArgumentNullException.ThrowIfNull(data);

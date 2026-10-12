@@ -14,6 +14,7 @@ public sealed record SerialSettings(
     string StopBits = "One")
 {
     /// <summary>Enforce the RTU 11-bit character rule and known enum names.</summary>
+    /// <exception cref="InvalidOperationException">Data bits are not 8, parity/stop-bits names are unknown, or no-parity is used without two stop bits.</exception>
     public void Validate()
     {
         if (DataBits != 8)

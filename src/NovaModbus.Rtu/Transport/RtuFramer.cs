@@ -16,6 +16,9 @@ public static class RtuFramer
     /// Baud rates above 19200 use the fixed 1.75ms value; at or below 19200 the
     /// exact 3.5-char time applies with a 2ms floor.
     /// </remarks>
+    /// <param name="baudRate">Baud rate in bits per second.</param>
+    /// <returns>The 3.5-character silent interval for the given baud rate.</returns>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="baudRate"/> is not positive.</exception>
     public static TimeSpan SilentInterval(int baudRate)
     {
         ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(baudRate, 0);
@@ -34,6 +37,9 @@ public static class RtuFramer
     /// exact 1.5-char time applies. A gap longer than this inside a frame marks
     /// the frame incomplete (discarded).
     /// </remarks>
+    /// <param name="baudRate">Baud rate in bits per second.</param>
+    /// <returns>The 1.5-character inter-character timeout for the given baud rate.</returns>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="baudRate"/> is not positive.</exception>
     public static TimeSpan InterCharInterval(int baudRate)
     {
         ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(baudRate, 0);
@@ -59,6 +65,11 @@ public static class RtuFramer
     /// <param name="silentIntervalOverride">Test hook replacing the derived t3.5.</param>
     /// <param name="interCharIntervalOverride">Test hook replacing the derived t1.5.</param>
     /// <param name="cancellationToken">User cancellation (throws).</param>
+    /// <returns>The received frame bytes, or null when no data arrives within the timeout or the frame is discarded as oversize.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="transport"/> is null.</exception>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="baudRate"/> is not positive, or <paramref name="timeout"/> is negative.</exception>
+    /// <exception cref="OperationCanceledException">Cancellation was requested via <paramref name="cancellationToken"/>.</exception>
+    /// <exception cref="EndOfStreamException">The transport closed (returned 0 bytes) while waiting for the first byte.</exception>
     public static async Task<byte[]?> ReadFrameAsync(
         ISerialTransport transport,
         int baudRate,
@@ -188,6 +199,10 @@ public static class RtuFramer
         }
     }
 
+    /// <summary>Read a single byte, translating transport timeouts into -1.</summary>
+    /// <param name="transport">Open serial transport.</param>
+    /// <param name="token">Linked wait/user token (user cancel still throws via the caller check).</param>
+    /// <returns>The byte value, or -1 on timeout/cancel-silence.</returns>
     private static async Task<int> ReadOnceAsync(ISerialTransport transport, CancellationToken token)
     {
         byte[] single = new byte[1];

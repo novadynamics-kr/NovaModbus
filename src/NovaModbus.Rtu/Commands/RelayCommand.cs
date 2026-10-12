@@ -10,6 +10,9 @@ public sealed class RelayCommand : ICommand
     private readonly SynchronizationContext? _context = SynchronizationContext.Current;
 
     /// <summary>Initializes a command (captures the current sync context for event marshal).</summary>
+    /// <param name="execute">Action invoked when the command executes.</param>
+    /// <param name="canExecute">Predicate determining whether the command can execute, or null to always allow execution.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="execute"/> is null.</exception>
     public RelayCommand(Action execute, Func<bool>? canExecute = null)
     {
         ArgumentNullException.ThrowIfNull(execute);
@@ -39,5 +42,6 @@ public sealed class RelayCommand : ICommand
         }
     }
 
+    /// <summary>Raise <see cref="CanExecuteChanged"/> on the captured context.</summary>
     private void Raise() => CanExecuteChanged?.Invoke(this, EventArgs.Empty);
 }

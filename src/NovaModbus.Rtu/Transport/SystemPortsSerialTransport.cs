@@ -64,6 +64,7 @@ public sealed class SystemPortsSerialTransport : ISerialTransport
         return ValueTask.CompletedTask;
     }
 
+    /// <summary>Detach error reporting, close and dispose the port (best effort).</summary>
     private void CloseCurrent()
     {
         try
@@ -85,6 +86,9 @@ public sealed class SystemPortsSerialTransport : ISerialTransport
         }
     }
 
+    /// <summary>Map port errors to line-error flags and raise <see cref="LineError"/>.</summary>
+    /// <param name="sender">Error source (unused).</param>
+    /// <param name="e">Serial error details (TXFull is ignored).</param>
     private void OnSerialError(object sender, SerialErrorReceivedEventArgs e)
     {
         SerialLineError error = e.EventType switch

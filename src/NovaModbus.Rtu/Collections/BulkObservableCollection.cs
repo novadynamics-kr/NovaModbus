@@ -7,6 +7,7 @@ namespace NovaModbus.Rtu.Collections;
 /// <summary>Items that support selection state with bulk suppression.</summary>
 public interface ISelectable
 {
+    /// <summary>Whether the item is currently selected.</summary>
     bool IsSelected { get; set; }
     /// <summary>When true, the item should not raise PropertyChanged for IsSelected.</summary>
     bool SuppressSelectionNotification { get; set; }
@@ -23,6 +24,7 @@ public sealed class BulkObservableCollection<T> : ObservableCollection<T> where 
     public BulkObservableCollection() : base() { }
 
     /// <summary>Initializes a collection with the specified items.</summary>
+    /// <param name="items">Initial items in the collection.</param>
     public BulkObservableCollection(IEnumerable<T> items) : base(items ?? []) { }
 
     /// <summary>Temporarily suppresses CollectionChanged and PropertyChanged events.</summary>
@@ -38,6 +40,7 @@ public sealed class BulkObservableCollection<T> : ObservableCollection<T> where 
     }
 
     /// <summary>Adds multiple items with a single notification.</summary>
+    /// <param name="items">Items to add; null is ignored.</param>
     public void AddRange(IEnumerable<T> items)
     {
         if (items is null) return;
@@ -47,6 +50,7 @@ public sealed class BulkObservableCollection<T> : ObservableCollection<T> where 
     }
 
     /// <summary>Removes multiple items with a single notification.</summary>
+    /// <param name="items">Items to remove; null is ignored.</param>
     public void RemoveRange(IEnumerable<T> items)
     {
         if (items is null) return;
@@ -61,6 +65,7 @@ public sealed class BulkObservableCollection<T> : ObservableCollection<T> where 
     }
 
     /// <summary>Replaces the entire collection with new items in one notification.</summary>
+    /// <param name="newItems">Replacement items; null clears the collection.</param>
     public void ReplaceAll(IEnumerable<T> newItems)
     {
         SuppressNotifications();
@@ -76,6 +81,7 @@ public sealed class BulkObservableCollection<T> : ObservableCollection<T> where 
     public void Refresh() => ResumeNotifications();
 
     /// <summary>Sets IsSelected on all items that implement ISelectable (single Reset notification).</summary>
+    /// <param name="selected">Selection state to apply to all selectable items.</param>
     public void SetAllSelected(bool selected)
     {
         SuppressNotifications();
@@ -100,11 +106,13 @@ public sealed class BulkObservableCollection<T> : ObservableCollection<T> where 
         finally { ResumeNotifications(); }
     }
 
+    /// <inheritdoc />
     protected override void OnCollectionChanged(NotifyCollectionChangedEventArgs e)
     {
         if (!_suppressNotification) base.OnCollectionChanged(e);
     }
 
+    /// <inheritdoc />
     protected override void OnPropertyChanged(PropertyChangedEventArgs e)
     {
         if (!_suppressNotification) base.OnPropertyChanged(e);

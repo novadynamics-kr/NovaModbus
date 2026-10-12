@@ -6,6 +6,7 @@ public sealed class SlaveServer
     private readonly ModbusRtuSlave _slave;
 
     /// <summary>Initializes a server driving the given slave.</summary>
+    /// <param name="slave">Configured slave to serve (engine IDs + stores already set up).</param>
     public SlaveServer(ModbusRtuSlave slave)
     {
         ArgumentNullException.ThrowIfNull(slave);
@@ -16,6 +17,8 @@ public sealed class SlaveServer
     public Exception? LastError { get; private set; }
 
     /// <summary>Serve requests until cancelled. Never throws for cancellation.</summary>
+    /// <param name="cancellationToken">Stops the loop; cancellation never surfaces as an exception.</param>
+    /// <returns>A task completing when the loop stops; inspect <see cref="LastError"/> for failures.</returns>
     public async Task RunAsync(CancellationToken cancellationToken = default)
     {
         while (!cancellationToken.IsCancellationRequested)

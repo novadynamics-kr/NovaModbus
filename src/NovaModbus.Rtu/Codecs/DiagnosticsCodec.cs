@@ -52,6 +52,9 @@ public static class DiagnosticsCodec
     }
 
     /// <summary>Encode body: [sub-function BE(2)][data...].</summary>
+    /// <param name="subfunction">Diagnostic sub-function code (0x0000-0x0014); see <see cref="Subfunctions"/>.</param>
+    /// <param name="data">Sub-function data payload (any length); appended verbatim after the sub-function.</param>
+    /// <returns>The encoded FC08 body: 2-byte big-endian sub-function followed by <paramref name="data"/>.</returns>
     public static byte[] Encode(ushort subfunction, ReadOnlySpan<byte> data)
     {
         byte[] body = new byte[2 + data.Length];
@@ -61,6 +64,10 @@ public static class DiagnosticsCodec
     }
 
     /// <summary>Decode body into sub-function and data.</summary>
+    /// <param name="body">FC08 body; must be at least 2 bytes: [sub-function BE(2)][data...].</param>
+    /// <param name="subfunction">Receives the big-endian sub-function code.</param>
+    /// <param name="data">Receives a copy of the bytes following the sub-function (may be empty).</param>
+    /// <exception cref="ArgumentException">Thrown when <paramref name="body"/> is shorter than 2 bytes.</exception>
     public static void Decode(ReadOnlySpan<byte> body, out ushort subfunction, out byte[] data)
     {
         if (body.Length < 2)
@@ -73,6 +80,8 @@ public static class DiagnosticsCodec
     }
 
     /// <summary>Encode a two-byte counter response payload (after the sub-function).</summary>
+    /// <param name="value">Counter value (0x0000-0xFFFF) to encode big-endian.</param>
+    /// <returns>A 2-byte big-endian encoding of <paramref name="value"/>.</returns>
     public static byte[] CounterData(ushort value)
     {
         byte[] data = new byte[2];

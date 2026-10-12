@@ -10,6 +10,10 @@ public sealed class VirtualSerialBus
     public static VirtualSerialBus Shared { get; } = new();
 
     /// <summary>Publish one end under a name (slave/demo side). Overwrites silently.</summary>
+    /// <param name="endpoint">Endpoint name to publish under.</param>
+    /// <param name="transport">Transport endpoint to publish.</param>
+    /// <exception cref="ArgumentException"><paramref name="endpoint"/> is null or whitespace.</exception>
+    /// <exception cref="ArgumentNullException"><paramref name="transport"/> is null.</exception>
     public void Publish(string endpoint, ISerialTransport transport)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(endpoint);
@@ -21,6 +25,10 @@ public sealed class VirtualSerialBus
     }
 
     /// <summary>Take the published end (exclusive handoff). Throws when missing.</summary>
+    /// <param name="endpoint">Endpoint name to connect to.</param>
+    /// <returns>The published transport endpoint.</returns>
+    /// <exception cref="ArgumentException"><paramref name="endpoint"/> is null or whitespace.</exception>
+    /// <exception cref="InvalidOperationException">No endpoint is published under <paramref name="endpoint"/>.</exception>
     public ISerialTransport Connect(string endpoint)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(endpoint);
@@ -36,6 +44,9 @@ public sealed class VirtualSerialBus
     }
 
     /// <summary>Remove a published end. Returns true when removed.</summary>
+    /// <param name="endpoint">Endpoint name to remove.</param>
+    /// <returns>True when the endpoint was published and removed; otherwise false.</returns>
+    /// <exception cref="ArgumentException"><paramref name="endpoint"/> is null or whitespace.</exception>
     public bool Unpublish(string endpoint)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(endpoint);
@@ -46,6 +57,7 @@ public sealed class VirtualSerialBus
     }
 
     /// <summary>Currently published endpoint names.</summary>
+    /// <returns>Names of the currently published endpoints.</returns>
     public string[] ListEndpoints()
     {
         lock (_sync)

@@ -16,6 +16,9 @@ public sealed class ModbusFrame
     public byte[] Data { get; }
 
     /// <summary>Initializes a new frame.</summary>
+    /// <param name="slaveId">Slave address (1-247, 0 = broadcast).</param>
+    /// <param name="function">Function code byte (MSB set for exceptions).</param>
+    /// <param name="data">Function PDU body (CRC excluded).</param>
     public ModbusFrame(byte slaveId, byte function, byte[] data)
     {
         SlaveId = slaveId;
@@ -24,6 +27,7 @@ public sealed class ModbusFrame
     }
 
     /// <summary>Encode to wire bytes including CRC.</summary>
+    /// <returns>Full ADU: [slaveId][function][data][CRC Lo][CRC Hi].</returns>
     public byte[] Encode()
     {
         byte[] frame = new byte[2 + Data.Length + 2];
@@ -35,6 +39,9 @@ public sealed class ModbusFrame
     }
 
     /// <summary>Try decode and verify CRC. Returns false on length/CRC error.</summary>
+    /// <param name="raw">Candidate wire bytes (address + function + data + CRC).</param>
+    /// <param name="frame">Receives the decoded frame on success; null otherwise.</param>
+    /// <returns>True when the length is 4..256 bytes and the CRC verifies.</returns>
     public static bool TryDecode(ReadOnlySpan<byte> raw, out ModbusFrame? frame)
     {
         frame = null;

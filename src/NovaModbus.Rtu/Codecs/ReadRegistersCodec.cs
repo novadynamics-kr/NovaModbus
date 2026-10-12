@@ -6,6 +6,10 @@ namespace NovaModbus.Rtu.Codecs;
 public static class ReadRegistersCodec
 {
     /// <summary>Encode request body: [start BE(2)][count BE(2)].</summary>
+    /// <param name="start">Zero-based start address.</param>
+    /// <param name="count">Registers to read, 1..125.</param>
+    /// <returns>4-byte request body.</returns>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown when <paramref name="count"/> is outside 1..125.</exception>
     public static byte[] EncodeRequest(ushort start, ushort count)
     {
         ValidateCount(count);
@@ -16,6 +20,10 @@ public static class ReadRegistersCodec
     }
 
     /// <summary>Decode request body into start/count.</summary>
+    /// <param name="body">4-byte request body.</param>
+    /// <param name="start">Receives the decoded start address.</param>
+    /// <param name="count">Receives the decoded register count.</param>
+    /// <exception cref="ArgumentException">Thrown on wrong length or count outside 1..125.</exception>
     public static void DecodeRequest(ReadOnlySpan<byte> body, out ushort start, out ushort count)
     {
         if (body.Length != 4)
@@ -29,6 +37,8 @@ public static class ReadRegistersCodec
     }
 
     /// <summary>Encode response body: [byteCount(1)][registers BE...].</summary>
+    /// <param name="values">Register values in address order, 1..125 items.</param>
+    /// <returns>Response body with leading byte count.</returns>
     public static byte[] EncodeResponse(IReadOnlyList<ushort> values)
     {
         ArgumentNullException.ThrowIfNull(values);
@@ -44,6 +54,9 @@ public static class ReadRegistersCodec
     }
 
     /// <summary>Decode response body into registers.</summary>
+    /// <param name="body">Response body starting with the byte count.</param>
+    /// <returns>Decoded register values.</returns>
+    /// <exception cref="ArgumentException">Thrown on byte-count mismatch or count outside 1..125.</exception>
     public static ushort[] DecodeResponse(ReadOnlySpan<byte> body)
     {
         if (body.Length < 1)
@@ -68,6 +81,9 @@ public static class ReadRegistersCodec
         return values;
     }
 
+    /// <summary>Reject counts outside 1..125.</summary>
+    /// <param name="count">Count to validate.</param>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown when out of range.</exception>
     private static void ValidateCount(int count)
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(count, 1);

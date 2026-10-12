@@ -4,12 +4,15 @@ namespace NovaModbus.Rtu.Logging;
 public interface IModbusLogger
 {
     /// <summary>Log TX frame.</summary>
+    /// <param name="frame">Transmitted frame bytes.</param>
     void LogTx(byte[] frame);
 
     /// <summary>Log RX frame.</summary>
+    /// <param name="frame">Received frame bytes.</param>
     void LogRx(byte[] frame);
 
     /// <summary>Log informational message.</summary>
+    /// <param name="message">Informational message to log.</param>
     void LogInfo(string message);
 }
 
