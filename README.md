@@ -51,9 +51,11 @@ dotnet test tests/NovaModbus.Rtu.Tests --filter "FullyQualifiedName~Crc16"
 커버리지 수집 (`Microsoft.CodeCoverage`, 테스트 프로젝트 한정):
 
 ```powershell
-dotnet test NovaModbus.slnx -c Release --collect:"Code Coverage"
+dotnet test NovaModbus.slnx -c Release --settings CodeCoverage.runsettings --collect:"Code Coverage"
 ```
 
+`CodeCoverage.runsettings`가 테스트 어셈블리(`*Tests.dll`)를 측정에서 제외하므로
+결과에는 제품 어셈블리(`NovaModbus.Rtu.dll`)만 포함된다.
 결과 `.coverage` 파일은 `tests/NovaModbus.Rtu.Tests/TestResults/`에 생성되며
 Visual Studio (2026) 에서 열어 확인한다. 수집물은 커밋하지 않는다.
 
