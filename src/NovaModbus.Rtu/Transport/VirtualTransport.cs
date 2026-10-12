@@ -28,6 +28,13 @@ public sealed class VirtualTransport : ISerialTransport
     public bool IsOpen => _isOpen;
 
     /// <inheritdoc />
+    /// <remarks>Never raised by line traffic (error-free by construction).</remarks>
+    public event EventHandler<SerialLineError>? LineError;
+
+    /// <summary>Raises <see cref="LineError"/> (error-injection hook for simulators and tests).</summary>
+    public void SimulateLineError(SerialLineError error) => LineError?.Invoke(this, error);
+
+    /// <inheritdoc />
     public Task OpenAsync(SerialSettings settings, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(settings);

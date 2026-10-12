@@ -38,11 +38,17 @@ public static class DiagnosticsCodec
         /// <summary>Return slave no-response count.</summary>
         public const ushort ReturnSlaveNoResponseCount = 0x000F;
 
+        /// <summary>Return slave NAK count.</summary>
+        public const ushort ReturnSlaveNakCount = 0x0010;
+
         /// <summary>Return slave busy count.</summary>
         public const ushort ReturnSlaveBusyCount = 0x0011;
 
         /// <summary>Return bus character overrun count.</summary>
         public const ushort ReturnBusOverrunCount = 0x0012;
+
+        /// <summary>Clear overrun counter and flag (echoes the request data).</summary>
+        public const ushort ClearOverrunCounter = 0x0014;
     }
 
     /// <summary>Encode body: [sub-function BE(2)][data...].</summary>

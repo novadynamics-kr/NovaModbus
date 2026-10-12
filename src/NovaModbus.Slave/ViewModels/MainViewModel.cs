@@ -830,7 +830,7 @@ public sealed class MainViewModel : ViewModelBase, IAsyncDisposable
 
             long requests = _slave?.Engine.GetCount(id) ?? 0;
             lines.Add($"ID {id}: requests={requests} msg={store.SlaveMessageCount} exc={store.SlaveExceptionCount} " +
-                $"noresp={store.NoResponseCount} busy={store.BusyCount} events={store.EventCount}");
+                $"noresp={store.NoResponseCount} busy={store.BusyCount} nak={store.NakCount} events={store.EventCount}");
         }
 
         if (_slave is not null)

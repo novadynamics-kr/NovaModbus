@@ -2,6 +2,7 @@ using NovaModbus.Rtu.Codecs;
 using NovaModbus.Rtu.Enums;
 using NovaModbus.Rtu.Errors;
 using NovaModbus.Rtu.Tests.Testing;
+using NovaModbus.Rtu.Transport;
 
 namespace NovaModbus.Rtu.Tests;
 
@@ -187,5 +188,99 @@ public sealed class SlaveDispatchTests
         Assert.AreEqual((ushort)222, ReadRegistersCodec.DecodeResponse(DecodeOk(r2, 0x03).Data)[0]);
         Assert.AreEqual(1, slave.Engine.GetCount(1));
         Assert.AreEqual(1, slave.Engine.GetCount(2));
+    }
+
+    [TestMethod]
+    public void DiagnosticsNakCountReturnsZero()
+    {
+        ModbusRtuSlave slave = CreateSlave();
+        byte[]? response = slave.HandleRequest(Request(
+            1, 0x08, DiagnosticsCodec.Encode(DiagnosticsCodec.Subfunctions.ReturnSlaveNakCount, [0x00, 0x00])));
+        ModbusFrame frame = DecodeOk(response, 0x08);
+        DiagnosticsCodec.Decode(frame.Data, out ushort sub, out byte[] data);
+        Assert.AreEqual(DiagnosticsCodec.Subfunctions.ReturnSlaveNakCount, sub);
+        CollectionAssert.AreEqual(new byte[] { 0x00, 0x00 }, data);
+    }
+
+    [TestMethod]
+    public void ClearCountersResetsNak()
+    {
+        ModbusRtuSlave slave = CreateSlave();
+        slave.Engine.TryGetStore(1, out ModbusDataStore? store);
+        Assert.IsNotNull(store);
+        store.NoteNak();
+        Assert.AreEqual(1, store.NakCount);
+
+        byte[]? response = slave.HandleRequest(Request(
+            1, 0x08, DiagnosticsCodec.Encode(DiagnosticsCodec.Subfunctions.ClearCounters, [0x00, 0x00])));
+        Assert.IsNotNull(response);
+        Assert.AreEqual(0, store.NakCount);
+    }
+
+    [TestMethod]
+    public void ClearOverrunCounterEchoesAndClears()
+    {
+        ModbusRtuSlave slave = CreateSlave();
+        slave.Engine.NoteOverrun();
+        slave.Engine.NoteOverrun();
+        Assert.AreEqual(2L, slave.Engine.OverrunCount);
+
+        byte[]? response = slave.HandleRequest(Request(
+            1, 0x08, DiagnosticsCodec.Encode(DiagnosticsCodec.Subfunctions.ClearOverrunCounter, [0x00, 0x00])));
+        ModbusFrame frame = DecodeOk(response, 0x08);
+        DiagnosticsCodec.Decode(frame.Data, out ushort sub, out byte[] data);
+        Assert.AreEqual(DiagnosticsCodec.Subfunctions.ClearOverrunCounter, sub);
+        CollectionAssert.AreEqual(new byte[] { 0x00, 0x00 }, data);
+        Assert.AreEqual(0L, slave.Engine.OverrunCount);
+    }
+
+    [TestMethod]
+    public void ListenOnlySilencesUntilRestart()
+    {
+        ModbusRtuSlave slave = CreateSlave();
+        slave.Engine.TryGetStore(1, out ModbusDataStore? store);
+        Assert.IsNotNull(store);
+
+        byte[]? enter = slave.HandleRequest(Request(
+            1, 0x08, DiagnosticsCodec.Encode(DiagnosticsCodec.Subfunctions.ForceListenOnlyMode, [0x00, 0x00])));
+        Assert.IsNull(enter);
+        Assert.IsTrue(store.ListenOnly);
+
+        // Normal requests are monitored only: no response, no further counting
+        // (the 0x04 entry request itself was processed normally: count 1).
+        Assert.IsNull(slave.HandleRequest(Request(1, 0x03, ReadRegistersCodec.EncodeRequest(0, 1))));
+        Assert.AreEqual(1, store.SlaveMessageCount);
+
+        // Malformed restart stays silent and stays listen-only.
+        Assert.IsNull(slave.HandleRequest(Request(
+            1, 0x08, DiagnosticsCodec.Encode(DiagnosticsCodec.Subfunctions.RestartCommunicationsOption, [0x12, 0x34]))));
+        Assert.IsTrue(store.ListenOnly);
+
+        // Valid restart exits listen-only without responding.
+        Assert.IsNull(slave.HandleRequest(Request(
+            1, 0x08, DiagnosticsCodec.Encode(DiagnosticsCodec.Subfunctions.RestartCommunicationsOption, [0x00, 0x00]))));
+        Assert.IsFalse(store.ListenOnly);
+
+        // Line serves again.
+        Assert.IsNotNull(slave.HandleRequest(Request(1, 0x03, ReadRegistersCodec.EncodeRequest(0, 1))));
+    }
+
+    [TestMethod]
+    public void LineErrorFeedsOverrunAndCommCounters()
+    {
+        FakeSerialTransport transport = new();
+        ModbusRtuSlave slave = new(transport);
+        slave.Engine.AddSlave(1);
+
+        transport.SimulateLineError(SerialLineError.Overrun);
+        Assert.AreEqual(1L, slave.Engine.OverrunCount);
+        Assert.AreEqual(1L, slave.Engine.CharErrorCount);
+
+        // Bus communication-error count includes character-level errors.
+        byte[]? response = slave.HandleRequest(Request(
+            1, 0x08, DiagnosticsCodec.Encode(DiagnosticsCodec.Subfunctions.ReturnBusCommErrorCount, [0x00, 0x00])));
+        ModbusFrame frame = DecodeOk(response, 0x08);
+        DiagnosticsCodec.Decode(frame.Data, out _, out byte[] data);
+        CollectionAssert.AreEqual(new byte[] { 0x00, 0x01 }, data);
     }
 }

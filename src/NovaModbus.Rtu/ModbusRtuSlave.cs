@@ -1,3 +1,4 @@
+using System.Buffers.Binary;
 using NovaModbus.Rtu.Codecs;
 using NovaModbus.Rtu.Enums;
 using NovaModbus.Rtu.Errors;
@@ -17,6 +18,7 @@ public sealed class ModbusRtuSlave : IAsyncDisposable
     {
         ArgumentNullException.ThrowIfNull(transport);
         _transport = transport;
+        _transport.LineError += OnLineError;
         _logger = logger ?? NullModbusLogger.Instance;
         _logger.LogInfo("Slave created.");
     }
@@ -66,6 +68,12 @@ public sealed class ModbusRtuSlave : IAsyncDisposable
 
         if (!Engine.TryGetStore(frame.SlaveId, out ModbusDataStore? store) || store is null)
         {
+            return null;
+        }
+
+        if (store.ListenOnly && !IsRestartRequest(frame.Function, frame.Data))
+        {
+            // Listen-only: monitor only, no action and no response.
             return null;
         }
 
@@ -312,32 +320,45 @@ public sealed class ModbusRtuSlave : IAsyncDisposable
             DiagnosticsCodec.Subfunctions.RestartCommunicationsOption => HandleRestartOption(slaveId, function, data, payload, store),
             DiagnosticsCodec.Subfunctions.ReturnDiagnosticRegister => OkFrame(slaveId, function,
                 DiagnosticsCodec.Encode(subfunction, DiagnosticsCodec.CounterData(store.DiagnosticRegister))),
-            DiagnosticsCodec.Subfunctions.ForceListenOnlyMode => null,
+            DiagnosticsCodec.Subfunctions.ForceListenOnlyMode => EnterListenOnly(store),
             DiagnosticsCodec.Subfunctions.ClearCounters => ClearAllCounters(slaveId, function, data, subfunction, store, engine),
             DiagnosticsCodec.Subfunctions.ReturnBusMessageCount => CounterFrame(slaveId, function, subfunction, engine.BusMessageCount),
-            DiagnosticsCodec.Subfunctions.ReturnBusCommErrorCount => CounterFrame(slaveId, function, subfunction, engine.BusCrcErrorCount),
+            DiagnosticsCodec.Subfunctions.ReturnBusCommErrorCount => CounterFrame(
+                slaveId, function, subfunction, engine.BusCrcErrorCount + engine.CharErrorCount),
             DiagnosticsCodec.Subfunctions.ReturnSlaveExceptionCount => CounterFrame(slaveId, function, subfunction, store.SlaveExceptionCount),
             DiagnosticsCodec.Subfunctions.ReturnSlaveMessageCount => CounterFrame(slaveId, function, subfunction, store.SlaveMessageCount),
             DiagnosticsCodec.Subfunctions.ReturnSlaveNoResponseCount => CounterFrame(slaveId, function, subfunction, store.NoResponseCount),
+            DiagnosticsCodec.Subfunctions.ReturnSlaveNakCount => CounterFrame(slaveId, function, subfunction, store.NakCount),
             DiagnosticsCodec.Subfunctions.ReturnSlaveBusyCount => CounterFrame(slaveId, function, subfunction, store.BusyCount),
-            DiagnosticsCodec.Subfunctions.ReturnBusOverrunCount => CounterFrame(slaveId, function, subfunction, 0),
+            DiagnosticsCodec.Subfunctions.ReturnBusOverrunCount => CounterFrame(slaveId, function, subfunction, engine.OverrunCount),
+            DiagnosticsCodec.Subfunctions.ClearOverrunCounter => ClearOverrun(slaveId, function, data, subfunction, engine),
             _ => ExceptionFrame(slaveId, function, ModbusExceptionCode.IllegalFunction),
         };
     }
 
-    private static byte[] HandleRestartOption(byte slaveId, byte function, byte[] data, byte[] payload, ModbusDataStore store)
+    private static byte[]? EnterListenOnly(ModbusDataStore store)
     {
+        store.ListenOnly = true;
+        return null;
+    }
+
+    private static byte[]? HandleRestartOption(byte slaveId, byte function, byte[] data, byte[] payload, ModbusDataStore store)
+    {
+        bool wasListenOnly = store.ListenOnly;
         if (payload is not ([0x00, 0x00] or [0xFF, 0x00]))
         {
-            return ExceptionFrame(slaveId, function, ModbusExceptionCode.IllegalDataValue);
+            // Malformed restart stays silent while listen-only.
+            return wasListenOnly ? null : ExceptionFrame(slaveId, function, ModbusExceptionCode.IllegalDataValue);
         }
 
+        store.ListenOnly = false;
         if (payload[0] == 0xFF)
         {
             store.ClearEventLog();
         }
 
-        return OkFrame(slaveId, function, data);
+        // A restart out of listen-only mode never returns a response.
+        return wasListenOnly ? null : OkFrame(slaveId, function, data);
     }
 
     private static byte[] ClearAllCounters(byte slaveId, byte function, byte[] data, ushort subfunction, ModbusDataStore store, ModbusSlaveEngine engine)
@@ -345,6 +366,23 @@ public sealed class ModbusRtuSlave : IAsyncDisposable
         store.ResetCounters();
         engine.ResetBusCounters();
         return OkFrame(slaveId, function, DiagnosticsCodec.Encode(subfunction, [0x00, 0x00]));
+    }
+
+    private static byte[] ClearOverrun(byte slaveId, byte function, byte[] data, ushort subfunction, ModbusSlaveEngine engine)
+    {
+        engine.ClearOverrun();
+        return OkFrame(slaveId, function, DiagnosticsCodec.Encode(subfunction, [0x00, 0x00]));
+    }
+
+    private static bool IsRestartRequest(byte functionByte, byte[] data)
+    {
+        if ((ModbusFunction)functionByte != ModbusFunction.Diagnostics || data.Length < 2)
+        {
+            return false;
+        }
+
+        return BinaryPrimitives.ReadUInt16BigEndian(data.AsSpan(0, 2))
+            == DiagnosticsCodec.Subfunctions.RestartCommunicationsOption;
     }
 
     private static byte[] CounterFrame(byte slaveId, byte function, ushort subfunction, long value) =>
@@ -500,6 +538,20 @@ public sealed class ModbusRtuSlave : IAsyncDisposable
     private static byte[] ExceptionFrame(byte slaveId, byte function, ModbusExceptionCode code) =>
         new ModbusFrame(slaveId, ExceptionCodec.ExceptionFunction((ModbusFunction)function), ExceptionCodec.Encode(code)).Encode();
 
+    private void OnLineError(object? sender, SerialLineError error)
+    {
+        // Character-level errors also feed the bus communication-error counter.
+        Engine.NoteCharError();
+        if ((error & SerialLineError.Overrun) != 0)
+        {
+            Engine.NoteOverrun();
+        }
+    }
+
     /// <inheritdoc />
-    public ValueTask DisposeAsync() => _transport.DisposeAsync();
+    public ValueTask DisposeAsync()
+    {
+        _transport.LineError -= OnLineError;
+        return _transport.DisposeAsync();
+    }
 }

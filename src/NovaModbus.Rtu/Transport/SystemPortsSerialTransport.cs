@@ -11,6 +11,9 @@ public sealed class SystemPortsSerialTransport : ISerialTransport
     public bool IsOpen => _port?.IsOpen == true;
 
     /// <inheritdoc />
+    public event EventHandler<SerialLineError>? LineError;
+
+    /// <inheritdoc />
     public Task OpenAsync(SerialSettings settings, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -24,6 +27,7 @@ public sealed class SystemPortsSerialTransport : ISerialTransport
             ReadTimeout = 1000,
             WriteTimeout = 1000,
         };
+        port.ErrorReceived += OnSerialError;
         port.Open();
         _port = port;
         return Task.CompletedTask;
@@ -64,7 +68,11 @@ public sealed class SystemPortsSerialTransport : ISerialTransport
     {
         try
         {
-            _port?.Close();
+            if (_port is not null)
+            {
+                _port.ErrorReceived -= OnSerialError;
+                _port.Close();
+            }
         }
         catch (IOException)
         {
@@ -74,6 +82,23 @@ public sealed class SystemPortsSerialTransport : ISerialTransport
         {
             _port?.Dispose();
             _port = null;
+        }
+    }
+
+    private void OnSerialError(object sender, SerialErrorReceivedEventArgs e)
+    {
+        SerialLineError error = e.EventType switch
+        {
+            SerialError.RXOver => SerialLineError.Overrun,
+            SerialError.Overrun => SerialLineError.Overrun,
+            SerialError.RXParity => SerialLineError.Parity,
+            SerialError.Frame => SerialLineError.Frame,
+            _ => SerialLineError.None,
+        };
+
+        if (error != SerialLineError.None)
+        {
+            LineError?.Invoke(this, error);
         }
     }
 }
