@@ -6,6 +6,8 @@ namespace NovaModbus.Rtu.Codecs;
 public static class FifoQueueCodec
 {
     /// <summary>Encode request body.</summary>
+    /// <param name="pointerAddress">FIFO pointer address (0x0000-0xFFFF) of the queue descriptor.</param>
+    /// <returns>A 2-byte big-endian encoding of <paramref name="pointerAddress"/>.</returns>
     public static byte[] EncodeRequest(ushort pointerAddress)
     {
         byte[] body = new byte[2];
@@ -14,6 +16,9 @@ public static class FifoQueueCodec
     }
 
     /// <summary>Decode request body.</summary>
+    /// <param name="body">Request body; must be exactly 2 bytes holding the big-endian pointer address.</param>
+    /// <returns>The FIFO pointer address.</returns>
+    /// <exception cref="ArgumentException">Thrown when <paramref name="body"/> is not exactly 2 bytes.</exception>
     public static ushort DecodeRequest(ReadOnlySpan<byte> body)
     {
         if (body.Length != 2)
@@ -25,6 +30,10 @@ public static class FifoQueueCodec
     }
 
     /// <summary>Encode response body (non-destructive read of up to 31 values).</summary>
+    /// <param name="values">Queue values to encode (0-31 registers).</param>
+    /// <returns>The encoded body: [byte count BE(2)][FIFO count BE(2)][big-endian values...].</returns>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="values"/> is <c>null</c>.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown when <paramref name="values"/> holds more than 31 entries.</exception>
     public static byte[] EncodeResponse(IReadOnlyList<ushort> values)
     {
         ArgumentNullException.ThrowIfNull(values);
@@ -45,6 +54,9 @@ public static class FifoQueueCodec
     }
 
     /// <summary>Decode response body into queue values.</summary>
+    /// <param name="body">Response body; at least 4 bytes: [byte count BE(2)][FIFO count BE(2)][values...] with consistent counts.</param>
+    /// <returns>The decoded queue register values.</returns>
+    /// <exception cref="ArgumentException">Thrown when <paramref name="body"/> is too short or its byte/FIFO counts mismatch.</exception>
     public static ushort[] DecodeResponse(ReadOnlySpan<byte> body)
     {
         if (body.Length < 4)

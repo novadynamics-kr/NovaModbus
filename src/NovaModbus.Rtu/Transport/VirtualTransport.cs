@@ -15,6 +15,7 @@ public sealed class VirtualTransport : ISerialTransport
     }
 
     /// <summary>Creates two linked endpoints (writes on one arrive on the other).</summary>
+    /// <returns>A pair of linked virtual transport endpoints.</returns>
     public static (VirtualTransport Left, VirtualTransport Right) CreatePair()
     {
         VirtualTransport left = new();
@@ -32,6 +33,7 @@ public sealed class VirtualTransport : ISerialTransport
     public event EventHandler<SerialLineError>? LineError;
 
     /// <summary>Raises <see cref="LineError"/> (error-injection hook for simulators and tests).</summary>
+    /// <param name="error">Serial line error to report to subscribers.</param>
     public void SimulateLineError(SerialLineError error) => LineError?.Invoke(this, error);
 
     /// <inheritdoc />

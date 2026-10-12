@@ -4,6 +4,8 @@ namespace NovaModbus.Rtu;
 public static class Hex
 {
     /// <summary>Format bytes as uppercase hex separated by spaces.</summary>
+    /// <param name="data">Bytes to format.</param>
+    /// <returns>Empty string for empty input; otherwise "XX XX ..." (e.g. "01 03").</returns>
     public static string Format(ReadOnlySpan<byte> data)
     {
         if (data.Length == 0)

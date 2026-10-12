@@ -4,6 +4,8 @@ namespace NovaModbus.Rtu.Codecs;
 public static class ModbusBitPacker
 {
     /// <summary>Pack bools into bytes, LSB first. Last byte zero-padded.</summary>
+    /// <param name="values">Coil/discrete states in address order.</param>
+    /// <returns>Packed bytes, <c>(values.Count + 7) / 8</c> long.</returns>
     public static byte[] Pack(IReadOnlyList<bool> values)
     {
         int byteCount = (values.Count + 7) / 8;
@@ -20,6 +22,10 @@ public static class ModbusBitPacker
     }
 
     /// <summary>Unpack <paramref name="count"/> bits from packed bytes, LSB first.</summary>
+    /// <param name="packed">Packed source bytes.</param>
+    /// <param name="count">Bits to extract; must fit in <paramref name="packed"/>.</param>
+    /// <returns>Unpacked states in address order.</returns>
+    /// <exception cref="ArgumentException">Thrown when <paramref name="packed"/> holds fewer than <paramref name="count"/> bits.</exception>
     public static bool[] Unpack(ReadOnlySpan<byte> packed, int count)
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(count, 0);

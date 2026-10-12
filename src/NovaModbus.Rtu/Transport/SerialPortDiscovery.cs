@@ -6,6 +6,7 @@ namespace NovaModbus.Rtu.Transport;
 public static class SerialPortDiscovery
 {
     /// <summary>Gets available port names, COM numbers sorted naturally (COM2 before COM10).</summary>
+    /// <returns>Available serial port names in natural sort order.</returns>
     public static string[] GetPortNames()
     {
         return SerialPort.GetPortNames().OrderBy(SortKey, Comparer<(string, int)>.Default).ToArray();

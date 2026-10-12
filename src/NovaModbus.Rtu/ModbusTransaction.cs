@@ -15,6 +15,19 @@ public static class ModbusTransaction
     /// ignored while the attempt timeout lasts. Slave exception responses raise
     /// <see cref="ModbusSlaveException"/>. Returns the response PDU body.
     /// </summary>
+    /// <param name="transport">Open serial transport.</param>
+    /// <param name="baudRate">Line baud rate used for frame timing.</param>
+    /// <param name="slaveId">Target slave ID (1-247; broadcast is rejected).</param>
+    /// <param name="function">Function code byte.</param>
+    /// <param name="requestBody">Function PDU body (CRC excluded).</param>
+    /// <param name="timeout">Per-attempt response wait budget.</param>
+    /// <param name="retries">Resend count after a timed-out attempt (0 = try once).</param>
+    /// <param name="silentIntervalOverride">Test hook replacing the derived t3.5.</param>
+    /// <param name="logger">Traffic logger; null selects the null logger.</param>
+    /// <param name="cancellationToken">Cancellation token (throws on cancel).</param>
+    /// <returns>Response PDU body (function echo verified).</returns>
+    /// <exception cref="ModbusSlaveException">Thrown on a matching exception response.</exception>
+    /// <exception cref="TimeoutException">Thrown when all attempts expire without a matching response.</exception>
     public static async Task<byte[]> ExchangeAsync(
         ISerialTransport transport,
         int baudRate,

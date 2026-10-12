@@ -12,12 +12,19 @@ public sealed class AsyncRelayCommand : ICommand
     private int _executing;
 
     /// <summary>Initializes a command (captures the current sync context for event/error marshal).</summary>
+    /// <param name="execute">Asynchronous action invoked when the command executes.</param>
+    /// <param name="canExecute">Predicate determining whether the command can execute, or null to always allow execution.</param>
+    /// <param name="onError">Handler invoked with execution failures, or null to swallow them.</param>
     public AsyncRelayCommand(Func<Task> execute, Func<bool>? canExecute = null, Action<Exception>? onError = null)
         : this(_ => execute(), canExecute, onError)
     {
     }
 
     /// <summary>Initializes a cancellable command.</summary>
+    /// <param name="execute">Asynchronous action invoked with a cancellation token when the command executes.</param>
+    /// <param name="canExecute">Predicate determining whether the command can execute, or null to always allow execution.</param>
+    /// <param name="onError">Handler invoked with execution failures, or null to swallow them.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="execute"/> is null.</exception>
     public AsyncRelayCommand(Func<CancellationToken, Task> execute, Func<bool>? canExecute = null, Action<Exception>? onError = null)
     {
         ArgumentNullException.ThrowIfNull(execute);
@@ -70,8 +77,11 @@ public sealed class AsyncRelayCommand : ICommand
         }
     }
 
+    /// <summary>Raise <see cref="CanExecuteChanged"/> on the captured context.</summary>
     private void Raise() => CanExecuteChanged?.Invoke(this, EventArgs.Empty);
 
+    /// <summary>Route an execution failure to the error handler, if any.</summary>
+    /// <param name="ex">Execution failure.</param>
     private void ReportError(Exception ex)
     {
         if (_onError is null)

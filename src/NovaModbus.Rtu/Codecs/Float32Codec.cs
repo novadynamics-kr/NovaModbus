@@ -20,6 +20,10 @@ public enum FloatWordOrder
 public static class Float32Codec
 {
     /// <summary>Encode a float into two registers in the given order.</summary>
+    /// <param name="value">The IEEE-754 single-precision value to encode.</param>
+    /// <param name="order">Byte/word order applied across the two registers.</param>
+    /// <returns>A two-register encoding of <paramref name="value"/> in <paramref name="order"/>.</returns>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown when <paramref name="order"/> is not a known <see cref="FloatWordOrder"/>.</exception>
     public static ushort[] Encode(float value, FloatWordOrder order)
     {
         uint bits = BitConverter.SingleToUInt32Bits(value);
@@ -38,6 +42,11 @@ public static class Float32Codec
     }
 
     /// <summary>Decode two registers into a float.</summary>
+    /// <param name="registers">Source registers; must contain exactly 2 entries laid out per <paramref name="order"/>.</param>
+    /// <param name="order">Byte/word order used to interpret <paramref name="registers"/>.</param>
+    /// <returns>The decoded IEEE-754 single-precision value.</returns>
+    /// <exception cref="ArgumentException">Thrown when <paramref name="registers"/> does not contain exactly 2 entries.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown when <paramref name="order"/> is not a known <see cref="FloatWordOrder"/>.</exception>
     public static float Decode(ReadOnlySpan<ushort> registers, FloatWordOrder order)
     {
         if (registers.Length != 2)
@@ -57,6 +66,9 @@ public static class Float32Codec
         return BitConverter.UInt32BitsToSingle((uint)((first << 16) | second));
     }
 
+    /// <summary>Swap the two bytes of a register.</summary>
+    /// <param name="value">The register value (0x0000-0xFFFF) to byte-swap.</param>
+    /// <returns><paramref name="value"/> with its high and low bytes exchanged.</returns>
     private static ushort Swap(ushort value) => (ushort)(((value & 0xFF) << 8) | (value >> 8));
 }
 
@@ -64,6 +76,9 @@ public static class Float32Codec
 public static class FloatWordOrderText
 {
     /// <summary>Big/Little Endian display name (e.g. "Big Endian (ABCD)").</summary>
+    /// <param name="order">The word order to describe.</param>
+    /// <returns>The human-readable display name for <paramref name="order"/>.</returns>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown when <paramref name="order"/> is not a known <see cref="FloatWordOrder"/>.</exception>
     public static string ToDisplayString(FloatWordOrder order) => order switch
     {
         FloatWordOrder.Abcd => "Big Endian (ABCD)",

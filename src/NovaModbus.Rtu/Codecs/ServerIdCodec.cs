@@ -4,9 +4,15 @@ namespace NovaModbus.Rtu.Codecs;
 public static class ServerIdCodec
 {
     /// <summary>Encode the empty request body.</summary>
+    /// <returns>An empty byte array, as the FC11 request carries no data.</returns>
     public static byte[] EncodeRequest() => [];
 
     /// <summary>Encode response body.</summary>
+    /// <param name="serverId">Server identifier bytes (any length); total payload must fit in 255 bytes.</param>
+    /// <param name="running">Run indicator; <c>true</c> encodes 0xFF (running), <c>false</c> encodes 0x00 (stopped).</param>
+    /// <param name="additional">Additional device-specific bytes appended after the run indicator.</param>
+    /// <returns>The encoded body: [byte count(1)][server ID...][run indicator(1)][additional...].</returns>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown when server ID plus run indicator plus additional data exceeds 255 bytes.</exception>
     public static byte[] EncodeResponse(ReadOnlySpan<byte> serverId, bool running, ReadOnlySpan<byte> additional)
     {
         if (serverId.Length + 1 + additional.Length > byte.MaxValue)
@@ -26,6 +32,10 @@ public static class ServerIdCodec
     /// Decode assuming no additional data (server ID = all but the last byte).
     /// Use the <paramref name="serverIdLength"/> overload when additional data exists.
     /// </summary>
+    /// <param name="body">Response body; at least 3 bytes with <c>body[0]</c> equal to <c>body.Length - 1</c>.</param>
+    /// <param name="serverId">Receives the server identifier bytes (all bytes between the count and the run indicator).</param>
+    /// <param name="running">Receives <c>true</c> when the run indicator is 0xFF, otherwise <c>false</c>.</param>
+    /// <exception cref="ArgumentException">Thrown when <paramref name="body"/> is shorter than 3 bytes or its byte count mismatches.</exception>
     public static void DecodeResponse(ReadOnlySpan<byte> body, out byte[] serverId, out bool running)
     {
         if (body.Length < 3 || body[0] != body.Length - 1)
@@ -38,6 +48,13 @@ public static class ServerIdCodec
     }
 
     /// <summary>Decode with a known server ID length, splitting off additional data.</summary>
+    /// <param name="body">Response body; at least <c>2 + serverIdLength</c> bytes with <c>body[0]</c> equal to <c>body.Length - 1</c>.</param>
+    /// <param name="serverIdLength">Length of the server identifier in bytes (0 or greater; must fit within <paramref name="body"/>).</param>
+    /// <param name="serverId">Receives the server identifier bytes.</param>
+    /// <param name="running">Receives <c>true</c> when the run indicator is 0xFF, otherwise <c>false</c>.</param>
+    /// <param name="additional">Receives the trailing device-specific bytes after the run indicator.</param>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown when <paramref name="serverIdLength"/> is negative.</exception>
+    /// <exception cref="ArgumentException">Thrown when <paramref name="body"/> is too short or its byte count mismatches.</exception>
     public static void DecodeResponse(ReadOnlySpan<byte> body, int serverIdLength, out byte[] serverId, out bool running, out byte[] additional)
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(serverIdLength, 0);
