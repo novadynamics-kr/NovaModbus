@@ -124,15 +124,88 @@ public sealed class SlaveExtendedTests
         ModbusRtuSlave slave = CreateSlave();
         slave.HandleRequest(Request(1, 0x03, ReadRegistersCodec.EncodeRequest(0, 1)));
 
+        // FC0B polls do not increment the event counter (spec §6.9).
         byte[]? counter = slave.HandleRequest(Request(1, 0x0B, CommEventCounterCodec.EncodeRequest()));
         CommEventCounterCodec.DecodeResponse(DecodeOk(counter, 0x0B).Data, out ushort status, out ushort events);
         Assert.AreEqual((ushort)0x0000, status);
-        Assert.AreEqual((ushort)2, events);
+        Assert.AreEqual((ushort)1, events);
 
+        // Message count is bus-level (== FC08 sub 0x0B): 3 valid frames so far.
+        // Log is newest-first: [FC0C-rx, FC0B-tx, FC0B-rx, FC03-tx, FC03-rx].
         byte[]? log = slave.HandleRequest(Request(1, 0x0C, CommEventLogCodec.EncodeRequest()));
         CommEventLogCodec.DecodeResponse(DecodeOk(log, 0x0C).Data, out _, out _, out ushort messages, out byte[] logged);
         Assert.AreEqual((ushort)3, messages);
-        Assert.HasCount(3, logged);
+        CollectionAssert.AreEqual(new byte[] { 0x80, 0x40, 0x80, 0x40, 0x80 }, logged);
+    }
+
+    [TestMethod]
+    public void EventCountExcludesPollsAndExceptions()
+    {
+        ModbusRtuSlave slave = CreateSlave();
+        slave.Engine.TryGetStore(1, out ModbusDataStore? store);
+        Assert.IsNotNull(store);
+
+        slave.HandleRequest(Request(1, 0x03, ReadRegistersCodec.EncodeRequest(0, 1)));
+        Assert.AreEqual(1, store.EventCount);
+
+        // Polls (FC07) and counter fetches (FC0B/FC0C) never increment.
+        slave.HandleRequest(Request(1, 0x07, ExceptionStatusCodec.EncodeRequest()));
+        slave.HandleRequest(Request(1, 0x0B, CommEventCounterCodec.EncodeRequest()));
+        slave.HandleRequest(Request(1, 0x0C, CommEventLogCodec.EncodeRequest()));
+        Assert.AreEqual(1, store.EventCount);
+
+        // Exception responses never increment.
+        slave.HandleRequest(Request(1, 0x03, ReadRegistersCodec.EncodeRequest(0xFFFF, 2)));
+        Assert.AreEqual(1, store.EventCount);
+
+        slave.HandleRequest(Request(1, 0x03, ReadRegistersCodec.EncodeRequest(0, 1)));
+        Assert.AreEqual(2, store.EventCount);
+    }
+
+    [TestMethod]
+    public void EventLogBytesFollowSpecLayoutNewestFirst()
+    {
+        ModbusRtuSlave slave = CreateSlave();
+        slave.Engine.TryGetStore(1, out ModbusDataStore? store);
+        Assert.IsNotNull(store);
+
+        slave.HandleRequest(Request(1, 0x03, ReadRegistersCodec.EncodeRequest(0, 1)));
+        CollectionAssert.AreEqual(new byte[] { 0x40, 0x80 }, store.ReadEventLog());
+
+        // Illegal address → exception 0x02 → send byte 0x41, no count increment.
+        slave.HandleRequest(Request(1, 0x03, ReadRegistersCodec.EncodeRequest(0xFFFF, 2)));
+        CollectionAssert.AreEqual(new byte[] { 0x41, 0x80, 0x40, 0x80 }, store.ReadEventLog());
+        Assert.AreEqual(1, store.EventCount);
+    }
+
+    [TestMethod]
+    public void RestartResetsEventCounter()
+    {
+        ModbusRtuSlave slave = CreateSlave();
+        slave.Engine.TryGetStore(1, out ModbusDataStore? store);
+        Assert.IsNotNull(store);
+
+        slave.HandleRequest(Request(1, 0x03, ReadRegistersCodec.EncodeRequest(0, 1)));
+        Assert.AreEqual(1, store.EventCount);
+
+        byte[]? response = slave.HandleRequest(Request(
+            1, 0x08, DiagnosticsCodec.Encode(DiagnosticsCodec.Subfunctions.RestartCommunicationsOption, [0x00, 0x00])));
+        Assert.IsNotNull(response);
+        Assert.AreEqual(0, store.EventCount);
+        // Restart logs its dedicated byte (no generic send event).
+        CollectionAssert.AreEqual(new byte[] { 0x00, 0x80, 0x40, 0x80 }, store.ReadEventLog());
+    }
+
+    [TestMethod]
+    public void ListenOnlyEnterLogsDedicatedByte()
+    {
+        ModbusRtuSlave slave = CreateSlave();
+        slave.Engine.TryGetStore(1, out ModbusDataStore? store);
+        Assert.IsNotNull(store);
+
+        Assert.IsNull(slave.HandleRequest(Request(
+            1, 0x08, DiagnosticsCodec.Encode(DiagnosticsCodec.Subfunctions.ForceListenOnlyMode, [0x00, 0x00]))));
+        CollectionAssert.AreEqual(new byte[] { 0x20, 0x80 }, store.ReadEventLog());
     }
 
     [TestMethod]

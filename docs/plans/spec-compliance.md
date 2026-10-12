@@ -17,8 +17,8 @@ In-scope FCs per AGENTS.md unchanged (2B/MEI + custom FC stay excluded).
 | G7 | App §6.8.1 | FC08 sub 0x10 NAK count | IllegalFunction | S3 |
 | G8 | App §6.8.1 | FC08 sub 0x14 clear overrun + flag | IllegalFunction | S3 |
 | G9 | App §6.8 | listen-only state: 0x04 enters (monitor only), only 0x01 exits, 0x01 silent while LO | stateless (0x04 just null) | S3 |
-| G10 | App §6.9/6.10 | FC11/12 status 0xFFFF when busy | always 0x0000 | S4 |
-| G11 | App §6.9 | event count: successful completion only; excl. exceptions/FC07/FC0B/FC0C | counted on every request | S4 |
+| G10 | App §6.9/6.10 | FC11/12 status 0xFFFF when busy | N/A by design: no long-running program commands exist, status stays 0x0000; SimulateBusy forces exception responses instead | S4 |
+| G11 | App §6.9 | event count: successful completion only; excl. exc/FC07/FC0B/FC0C/resets | counted on every request | S4 |
 | G12 | App §6.10 | FC12 message count = bus-level (== FC08 0x0B) | slave-level count | S4 |
 | G13 | App §6.10 | event bytes: rx/tx bit layouts, listen-only=0x20, restart=0x00, newest-first | 0x00/0xFF oldest-first | S4 |
 | G14 | App §6.9 | FC08 0x01 also resets event counter | log-only handling | S4 |

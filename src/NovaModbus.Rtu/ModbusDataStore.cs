@@ -316,25 +316,60 @@ public sealed class ModbusDataStore
     public void NoteNak() => Interlocked.Increment(ref _nakCount);
 
     /// <summary>Record a comm event and append a log byte.</summary>
-    public void NoteEvent(byte eventByte)
+    [Obsolete("Use NoteReceiveEvent/NoteSendEvent plus NoteEventCount (spec §6.10 semantics).")]
+    public void NoteEvent(byte eventByte) => NoteReceiveEvent(eventByte);
+
+    /// <summary>Append a receive-event byte (no counter change).</summary>
+    public void NoteReceiveEvent(byte eventByte)
+    {
+        lock (_sync)
+        {
+            AppendEvent(eventByte);
+        }
+    }
+
+    /// <summary>Append a send-event byte (no counter change).</summary>
+    public void NoteSendEvent(byte eventByte)
+    {
+        lock (_sync)
+        {
+            AppendEvent(eventByte);
+        }
+    }
+
+    /// <summary>Count one successful message completion (FC0B event counter).</summary>
+    public void NoteEventCount()
     {
         lock (_sync)
         {
             _eventCount++;
-            _eventLog.Enqueue(eventByte);
-            while (_eventLog.Count > ModbusLimits.MaxEventLogBytes)
-            {
-                _eventLog.Dequeue();
-            }
         }
     }
 
-    /// <summary>Snapshot of the comm event log (oldest first).</summary>
+    /// <summary>Reset the comm-event counter (FC08 sub 0x0001).</summary>
+    public void ResetEventCount()
+    {
+        lock (_sync)
+        {
+            _eventCount = 0;
+        }
+    }
+
+    private void AppendEvent(byte eventByte)
+    {
+        _eventLog.Enqueue(eventByte);
+        while (_eventLog.Count > ModbusLimits.MaxEventLogBytes)
+        {
+            _eventLog.Dequeue();
+        }
+    }
+
+    /// <summary>Snapshot of the comm event log (newest first, per spec §6.10).</summary>
     public byte[] ReadEventLog()
     {
         lock (_sync)
         {
-            return [.. _eventLog];
+            return [.. _eventLog.Reverse()];
         }
     }
 
