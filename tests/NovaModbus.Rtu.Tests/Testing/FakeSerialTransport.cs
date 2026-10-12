@@ -27,6 +27,9 @@ public sealed class FakeSerialTransport : ISerialTransport
     public bool IsOpen => _isOpen;
 
     /// <inheritdoc />
+    public event EventHandler<SerialLineError>? LineError;
+
+    /// <inheritdoc />
     public Task OpenAsync(SerialSettings settings, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(settings);
@@ -122,6 +125,9 @@ public sealed class FakeSerialTransport : ISerialTransport
 
         _signal.Release(data.Length);
     }
+
+    /// <summary>Simulates a line error (as if reported by the port).</summary>
+    public void SimulateLineError(SerialLineError error) => LineError?.Invoke(this, error);
 
     /// <summary>Drains bytes written to this transport (single-ended use).</summary>
     public byte[] TakeWritten()

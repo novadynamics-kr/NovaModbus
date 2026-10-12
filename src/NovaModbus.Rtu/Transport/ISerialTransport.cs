@@ -17,4 +17,10 @@ public interface ISerialTransport : IAsyncDisposable
 
     /// <summary>Discard pending RX bytes.</summary>
     Task DiscardInBufferAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Raised when the line reports parity/framing/overrun errors.
+    /// Transports without error reporting never raise it.
+    /// </summary>
+    event EventHandler<SerialLineError>? LineError;
 }

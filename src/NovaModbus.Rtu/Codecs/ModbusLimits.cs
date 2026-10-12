@@ -15,6 +15,12 @@ public static class ModbusLimits
     /// <summary>Max registers per FC16 request.</summary>
     public const int MaxWriteRegisters = 123;
 
+    /// <summary>Max registers in the FC17 write part (ADU cap: 11 + 2N).</summary>
+    public const int MaxWriteRegisters17 = 121;
+
+    /// <summary>Max PDU size in bytes (ADU cap minus address/function/CRC).</summary>
+    public const int MaxPduSize = 253;
+
     /// <summary>Max file-record sub-requests per FC14/15 request.</summary>
     public const int MaxFileSubRequests = 35;
 
@@ -38,4 +44,7 @@ public static class ModbusLimits
 
     /// <summary>Max bulk-add item count (UI range operations).</summary>
     public const int MaxBulkAdd = 65535;
+
+    /// <summary>Broadcast slave address (0): all slaves act, none respond.</summary>
+    public const byte BroadcastAddress = 0;
 }

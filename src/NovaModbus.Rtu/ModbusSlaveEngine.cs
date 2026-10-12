@@ -42,19 +42,38 @@ public sealed class ModbusSlaveEngine
     /// <summary>Gets the CRC-error frame count (device level).</summary>
     public long BusCrcErrorCount => Interlocked.Read(ref _busCrcErrorCount);
 
+    /// <summary>Gets the character-level error count: parity, framing, overrun (device level).</summary>
+    public long CharErrorCount => Interlocked.Read(ref _charErrorCount);
+
+    /// <summary>Gets the character-overrun count (device level).</summary>
+    public long OverrunCount => Interlocked.Read(ref _overrunCount);
+
     /// <summary>Record a CRC-valid frame on the line.</summary>
     public void NoteBusMessage() => Interlocked.Increment(ref _busMessageCount);
 
     /// <summary>Record a CRC-error frame on the line.</summary>
     public void NoteBusCrcError() => Interlocked.Increment(ref _busCrcErrorCount);
 
+    /// <summary>Record a character-level line error (parity/framing/overrun).</summary>
+    public void NoteCharError() => Interlocked.Increment(ref _charErrorCount);
+
+    /// <summary>Record a character-overrun condition on the line.</summary>
+    public void NoteOverrun() => Interlocked.Increment(ref _overrunCount);
+
+    /// <summary>Clear the overrun counter and flag.</summary>
+    public void ClearOverrun() => Interlocked.Exchange(ref _overrunCount, 0);
+
     /// <summary>Reset device-level bus counters.</summary>
     public void ResetBusCounters()
     {
         Interlocked.Exchange(ref _busMessageCount, 0);
         Interlocked.Exchange(ref _busCrcErrorCount, 0);
+        Interlocked.Exchange(ref _charErrorCount, 0);
+        Interlocked.Exchange(ref _overrunCount, 0);
     }
 
     private long _busMessageCount;
     private long _busCrcErrorCount;
+    private long _charErrorCount;
+    private long _overrunCount;
 }

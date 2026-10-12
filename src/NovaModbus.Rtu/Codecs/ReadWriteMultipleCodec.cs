@@ -67,6 +67,6 @@ public static class ReadWriteMultipleCodec
     private static void ValidateWriteCount(int count)
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(count, 1);
-        ArgumentOutOfRangeException.ThrowIfGreaterThan(count, ModbusLimits.MaxWriteRegisters);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(count, ModbusLimits.MaxWriteRegisters17);
     }
 }

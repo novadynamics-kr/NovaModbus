@@ -7,6 +7,7 @@ public static class TransportFactory
     public static async Task<ISerialTransport> OpenSerialAsync(SerialSettings settings, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(settings);
+        settings.Validate();
         SystemPortsSerialTransport transport = new();
         await transport.OpenAsync(settings, cancellationToken).ConfigureAwait(false);
         return transport;

@@ -1,4 +1,5 @@
 using NovaModbus.Rtu.Enums;
+using NovaModbus.Rtu.Transport;
 
 namespace NovaModbus.Rtu;
 
@@ -37,7 +38,7 @@ public sealed class ModbusFrame
     public static bool TryDecode(ReadOnlySpan<byte> raw, out ModbusFrame? frame)
     {
         frame = null;
-        if (raw.Length < 4 || !Crc16.Verify(raw))
+        if (raw.Length < 4 || raw.Length > RtuFramer.MaxFrameSize || !Crc16.Verify(raw))
         {
             return false;
         }

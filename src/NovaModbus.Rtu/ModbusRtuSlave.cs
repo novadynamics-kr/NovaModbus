@@ -1,3 +1,4 @@
+using System.Buffers.Binary;
 using NovaModbus.Rtu.Codecs;
 using NovaModbus.Rtu.Enums;
 using NovaModbus.Rtu.Errors;
@@ -17,6 +18,7 @@ public sealed class ModbusRtuSlave : IAsyncDisposable
     {
         ArgumentNullException.ThrowIfNull(transport);
         _transport = transport;
+        _transport.LineError += OnLineError;
         _logger = logger ?? NullModbusLogger.Instance;
         _logger.LogInfo("Slave created.");
     }
@@ -58,14 +60,26 @@ public sealed class ModbusRtuSlave : IAsyncDisposable
         }
 
         Engine.NoteBusMessage();
+        if (frame.SlaveId == ModbusLimits.BroadcastAddress)
+        {
+            HandleBroadcast(frame.Function, frame.Data);
+            return null;
+        }
+
         if (!Engine.TryGetStore(frame.SlaveId, out ModbusDataStore? store) || store is null)
         {
             return null;
         }
 
+        if (store.ListenOnly && !IsRestartRequest(frame.Function, frame.Data))
+        {
+            // Listen-only: monitor only, no action and no response.
+            return null;
+        }
+
         Engine.IncrementCount(frame.SlaveId);
         store.NoteSlaveMessage();
-        store.NoteEvent(0x00);
+        store.NoteReceiveEvent(ReceiveEventNormal);
         _logger.LogRx(requestWire);
         if (SimulateBusy)
         {
@@ -74,19 +88,30 @@ public sealed class ModbusRtuSlave : IAsyncDisposable
         }
 
         byte[]? response = Dispatch(frame.SlaveId, frame.Function, frame.Data, store, Engine);
+        if (response is not null && (response[1] & 0x80) != 0)
+        {
+            // Exception responses never increment the event counter.
+            store.NoteSlaveException();
+            store.NoteSendEvent(SendEventFor((ModbusExceptionCode)response[2]));
+            _logger.LogTx(response);
+            return response;
+        }
+
         if (response is null)
         {
             store.NoteNoResponse();
-            return null;
         }
-
-        if ((response[1] & 0x80) != 0)
+        else
         {
-            store.NoteSlaveException();
-            store.NoteEvent(0xFF);
+            _logger.LogTx(response);
         }
 
-        _logger.LogTx(response);
+        store.NoteSendEvent(DedicatedSendEvent(frame.Function, frame.Data) ?? SendEventNormal);
+        if (IsCountable(frame.Function, frame.Data))
+        {
+            store.NoteEventCount();
+        }
+
         return response;
     }
 
@@ -94,7 +119,7 @@ public sealed class ModbusRtuSlave : IAsyncDisposable
     public async Task<bool> ServeOnceAsync(TimeSpan? silentIntervalOverride = null, CancellationToken cancellationToken = default)
     {
         byte[]? raw = await RtuFramer.ReadFrameAsync(
-            _transport, BaudRate, Timeout, silentIntervalOverride, cancellationToken).ConfigureAwait(false);
+            _transport, BaudRate, Timeout, silentIntervalOverride, null, cancellationToken).ConfigureAwait(false);
         if (raw is null)
         {
             return false;
@@ -109,8 +134,56 @@ public sealed class ModbusRtuSlave : IAsyncDisposable
         return true;
     }
 
-    private static byte[]? Dispatch(byte slaveId, byte functionByte, byte[] data, ModbusDataStore store, ModbusSlaveEngine engine)
+    /// <summary>
+    /// Execute a broadcast request on every store. Only writing functions are applied;
+    /// reads, diagnostics and unknown functions are ignored. Never responds
+    /// (not even exceptions or busy), per spec.
+    /// </summary>
+    private void HandleBroadcast(byte functionByte, byte[] data)
     {
+        ModbusFunction function = (ModbusFunction)functionByte;
+        bool writable = function is ModbusFunction.WriteSingleCoil
+            or ModbusFunction.WriteSingleRegister
+            or ModbusFunction.WriteMultipleCoils
+            or ModbusFunction.WriteMultipleRegisters
+            or ModbusFunction.WriteFileRecord
+            or ModbusFunction.MaskWriteRegister
+            or ModbusFunction.ReadWriteMultipleRegisters;
+        if (!writable)
+        {
+            return;
+        }
+
+        foreach (byte id in Engine.SlaveIds)
+        {
+            if (!Engine.TryGetStore(id, out ModbusDataStore? store) || store is null)
+            {
+                continue;
+            }
+
+            store.NoteSlaveMessage();
+            store.NoteReceiveEvent(ReceiveEventBroadcast);
+            byte[]? response = Dispatch(id, functionByte, data, store, Engine);
+            if (response is null)
+            {
+                store.NoteNoResponse();
+                store.NoteSendEvent(SendEventNormal);
+                continue;
+            }
+
+            if ((response[1] & 0x80) != 0)
+            {
+                // Broadcast exceptions are recorded locally but never sent.
+                store.NoteSendEvent(SendEventFor((ModbusExceptionCode)response[2]));
+                continue;
+            }
+
+            store.NoteSendEvent(SendEventNormal);
+            store.NoteEventCount();
+        }
+    }
+
+    private static byte[]? Dispatch(byte slaveId, byte functionByte, byte[] data, ModbusDataStore store, ModbusSlaveEngine engine)    {
         ModbusFunction function = (ModbusFunction)functionByte;
         return function switch
         {
@@ -123,7 +196,7 @@ public sealed class ModbusRtuSlave : IAsyncDisposable
             ModbusFunction.ReadExceptionStatus => OkFrame(slaveId, functionByte, [store.ExceptionStatus]),
             ModbusFunction.Diagnostics => HandleDiagnostics(slaveId, functionByte, data, store, engine),
             ModbusFunction.GetCommEventCounter => HandleCommEventCounter(slaveId, functionByte, store),
-            ModbusFunction.GetCommEventLog => HandleCommEventLog(slaveId, functionByte, store),
+            ModbusFunction.GetCommEventLog => HandleCommEventLog(slaveId, functionByte, store, engine),
             ModbusFunction.WriteMultipleCoils => HandleWriteMultipleCoils(slaveId, functionByte, data, store),
             ModbusFunction.WriteMultipleRegisters => HandleWriteMultipleRegisters(slaveId, functionByte, data, store),
             ModbusFunction.ReportServerId => HandleReportServerId(slaveId, functionByte, store),
@@ -139,7 +212,7 @@ public sealed class ModbusRtuSlave : IAsyncDisposable
     private static byte[] ExceptionResponse(byte slaveId, byte function, ModbusExceptionCode code, ModbusDataStore store)
     {
         store.NoteSlaveException();
-        store.NoteEvent(0xFF);
+        store.NoteSendEvent(SendEventFor(code));
         return ExceptionFrame(slaveId, function, code);
     }
 
@@ -274,32 +347,46 @@ public sealed class ModbusRtuSlave : IAsyncDisposable
             DiagnosticsCodec.Subfunctions.RestartCommunicationsOption => HandleRestartOption(slaveId, function, data, payload, store),
             DiagnosticsCodec.Subfunctions.ReturnDiagnosticRegister => OkFrame(slaveId, function,
                 DiagnosticsCodec.Encode(subfunction, DiagnosticsCodec.CounterData(store.DiagnosticRegister))),
-            DiagnosticsCodec.Subfunctions.ForceListenOnlyMode => null,
+            DiagnosticsCodec.Subfunctions.ForceListenOnlyMode => EnterListenOnly(store),
             DiagnosticsCodec.Subfunctions.ClearCounters => ClearAllCounters(slaveId, function, data, subfunction, store, engine),
             DiagnosticsCodec.Subfunctions.ReturnBusMessageCount => CounterFrame(slaveId, function, subfunction, engine.BusMessageCount),
-            DiagnosticsCodec.Subfunctions.ReturnBusCommErrorCount => CounterFrame(slaveId, function, subfunction, engine.BusCrcErrorCount),
+            DiagnosticsCodec.Subfunctions.ReturnBusCommErrorCount => CounterFrame(
+                slaveId, function, subfunction, engine.BusCrcErrorCount + engine.CharErrorCount),
             DiagnosticsCodec.Subfunctions.ReturnSlaveExceptionCount => CounterFrame(slaveId, function, subfunction, store.SlaveExceptionCount),
             DiagnosticsCodec.Subfunctions.ReturnSlaveMessageCount => CounterFrame(slaveId, function, subfunction, store.SlaveMessageCount),
             DiagnosticsCodec.Subfunctions.ReturnSlaveNoResponseCount => CounterFrame(slaveId, function, subfunction, store.NoResponseCount),
+            DiagnosticsCodec.Subfunctions.ReturnSlaveNakCount => CounterFrame(slaveId, function, subfunction, store.NakCount),
             DiagnosticsCodec.Subfunctions.ReturnSlaveBusyCount => CounterFrame(slaveId, function, subfunction, store.BusyCount),
-            DiagnosticsCodec.Subfunctions.ReturnBusOverrunCount => CounterFrame(slaveId, function, subfunction, 0),
+            DiagnosticsCodec.Subfunctions.ReturnBusOverrunCount => CounterFrame(slaveId, function, subfunction, engine.OverrunCount),
+            DiagnosticsCodec.Subfunctions.ClearOverrunCounter => ClearOverrun(slaveId, function, data, subfunction, engine),
             _ => ExceptionFrame(slaveId, function, ModbusExceptionCode.IllegalFunction),
         };
     }
 
-    private static byte[] HandleRestartOption(byte slaveId, byte function, byte[] data, byte[] payload, ModbusDataStore store)
+    private static byte[]? EnterListenOnly(ModbusDataStore store)
     {
+        store.ListenOnly = true;
+        return null;
+    }
+
+    private static byte[]? HandleRestartOption(byte slaveId, byte function, byte[] data, byte[] payload, ModbusDataStore store)
+    {
+        bool wasListenOnly = store.ListenOnly;
         if (payload is not ([0x00, 0x00] or [0xFF, 0x00]))
         {
-            return ExceptionFrame(slaveId, function, ModbusExceptionCode.IllegalDataValue);
+            // Malformed restart stays silent while listen-only.
+            return wasListenOnly ? null : ExceptionFrame(slaveId, function, ModbusExceptionCode.IllegalDataValue);
         }
 
+        store.ListenOnly = false;
+        store.ResetEventCount();
         if (payload[0] == 0xFF)
         {
             store.ClearEventLog();
         }
 
-        return OkFrame(slaveId, function, data);
+        // A restart out of listen-only mode never returns a response.
+        return wasListenOnly ? null : OkFrame(slaveId, function, data);
     }
 
     private static byte[] ClearAllCounters(byte slaveId, byte function, byte[] data, ushort subfunction, ModbusDataStore store, ModbusSlaveEngine engine)
@@ -309,15 +396,25 @@ public sealed class ModbusRtuSlave : IAsyncDisposable
         return OkFrame(slaveId, function, DiagnosticsCodec.Encode(subfunction, [0x00, 0x00]));
     }
 
+    private static byte[] ClearOverrun(byte slaveId, byte function, byte[] data, ushort subfunction, ModbusSlaveEngine engine)
+    {
+        engine.ClearOverrun();
+        return OkFrame(slaveId, function, DiagnosticsCodec.Encode(subfunction, [0x00, 0x00]));
+    }
+
+    private static bool IsRestartRequest(byte functionByte, byte[] data) =>
+        TryDiagnosticsSubfunction(functionByte, data, out ushort subfunction)
+        && subfunction == DiagnosticsCodec.Subfunctions.RestartCommunicationsOption;
+
     private static byte[] CounterFrame(byte slaveId, byte function, ushort subfunction, long value) =>
         OkFrame(slaveId, function, DiagnosticsCodec.Encode(subfunction, DiagnosticsCodec.CounterData(Clamp16(value))));
 
     private static byte[] HandleCommEventCounter(byte slaveId, byte function, ModbusDataStore store) =>
         OkFrame(slaveId, function, CommEventCounterCodec.EncodeResponse(0x0000, Clamp16(store.EventCount)));
 
-    private static byte[] HandleCommEventLog(byte slaveId, byte function, ModbusDataStore store) =>
+    private static byte[] HandleCommEventLog(byte slaveId, byte function, ModbusDataStore store, ModbusSlaveEngine engine) =>
         OkFrame(slaveId, function, CommEventLogCodec.EncodeResponse(
-            0x0000, Clamp16(store.EventCount), Clamp16(store.SlaveMessageCount), store.ReadEventLog()));
+            0x0000, Clamp16(store.EventCount), Clamp16(engine.BusMessageCount), store.ReadEventLog()));
 
     private static byte[] HandleReportServerId(byte slaveId, byte function, ModbusDataStore store)
     {
@@ -348,6 +445,12 @@ public sealed class ModbusRtuSlave : IAsyncDisposable
             {
                 return ExceptionFrame(slaveId, function, ModbusExceptionCode.IllegalDataAddress);
             }
+        }
+
+        if (1 + records.Sum(r => 2 + (r.Length * 2)) > ModbusLimits.MaxPduSize)
+        {
+            // Valid request the device cannot answer within the PDU cap.
+            return ExceptionFrame(slaveId, function, ModbusExceptionCode.SlaveDeviceFailure);
         }
 
         return OkFrame(slaveId, function, FileRecordCodec.EncodeReadResponse(records));
@@ -453,6 +556,81 @@ public sealed class ModbusRtuSlave : IAsyncDisposable
 
     private static ushort Clamp16(long value) => (ushort)Math.Min(value, (long)ushort.MaxValue);
 
+    // FC0C event-byte base values (spec §6.10).
+    private const byte ReceiveEventNormal = 0x80; // receive event, unicast
+    private const byte ReceiveEventBroadcast = 0xC0; // receive event, broadcast received
+    private const byte SendEventNormal = 0x40; // send event, no exception
+    private const byte EnteredListenOnlyEvent = 0x20; // entered listen-only mode
+    private const byte RestartEvent = 0x00; // communications restart
+
+    /// <summary>Send-event byte for an exception outcome (spec §6.10 bit layout).</summary>
+    private static byte SendEventFor(ModbusExceptionCode code) => code switch
+    {
+        ModbusExceptionCode.IllegalFunction
+            or ModbusExceptionCode.IllegalDataAddress
+            or ModbusExceptionCode.IllegalDataValue => 0x41,
+        ModbusExceptionCode.SlaveDeviceFailure => 0x42,
+        ModbusExceptionCode.Acknowledge
+            or ModbusExceptionCode.SlaveDeviceBusy => 0x44,
+        ModbusExceptionCode.NegativeAcknowledge => 0x48,
+        _ => SendEventNormal,
+    };
+
+    /// <summary>
+    /// Dedicated completion byte for listen-only entry / restart, or null for a
+    /// generic send event. Interpretation note: the spec's worked FC12 example shows
+    /// one byte per operation; dedicated bytes replace the generic send event here.
+    /// </summary>
+    private static byte? DedicatedSendEvent(byte functionByte, byte[] data)
+    {
+        if (!TryDiagnosticsSubfunction(functionByte, data, out ushort subfunction))
+        {
+            return null;
+        }
+
+        if (subfunction == DiagnosticsCodec.Subfunctions.ForceListenOnlyMode)
+        {
+            return EnteredListenOnlyEvent;
+        }
+
+        return subfunction == DiagnosticsCodec.Subfunctions.RestartCommunicationsOption
+            ? RestartEvent
+            : null;
+    }
+
+    private static bool TryDiagnosticsSubfunction(byte functionByte, byte[] data, out ushort subfunction)
+    {
+        subfunction = 0;
+        if ((ModbusFunction)functionByte != ModbusFunction.Diagnostics || data.Length < 2)
+        {
+            return false;
+        }
+
+        subfunction = BinaryPrimitives.ReadUInt16BigEndian(data.AsSpan(0, 2));
+        return true;
+    }
+
+    /// <summary>
+    /// Event-counter eligibility (spec §6.9): incremented on successful completion
+    /// except polls (FC07), counter fetches (FC0B/FC0C) and counter resets (FC08/01, FC08/0A).
+    /// Never on exceptions.
+    /// </summary>
+    private static bool IsCountable(byte functionByte, byte[] data)
+    {
+        if ((ModbusFunction)functionByte is ModbusFunction.ReadExceptionStatus
+            or ModbusFunction.GetCommEventCounter
+            or ModbusFunction.GetCommEventLog)
+        {
+            return false;
+        }
+
+        // A reset must stay observable as zero: the resetting op itself is not counted.
+        return !TryDiagnosticsSubfunction(functionByte, data, out ushort subfunction)
+            || subfunction is not (
+                DiagnosticsCodec.Subfunctions.RestartCommunicationsOption
+                or DiagnosticsCodec.Subfunctions.ClearCounters);
+    }
+
     private static bool InRange(int start, int count, int capacity) =>
         start >= 0 && count >= 0 && start + count <= capacity;
 
@@ -462,6 +640,20 @@ public sealed class ModbusRtuSlave : IAsyncDisposable
     private static byte[] ExceptionFrame(byte slaveId, byte function, ModbusExceptionCode code) =>
         new ModbusFrame(slaveId, ExceptionCodec.ExceptionFunction((ModbusFunction)function), ExceptionCodec.Encode(code)).Encode();
 
+    private void OnLineError(object? sender, SerialLineError error)
+    {
+        // Character-level errors also feed the bus communication-error counter.
+        Engine.NoteCharError();
+        if ((error & SerialLineError.Overrun) != 0)
+        {
+            Engine.NoteOverrun();
+        }
+    }
+
     /// <inheritdoc />
-    public ValueTask DisposeAsync() => _transport.DisposeAsync();
+    public ValueTask DisposeAsync()
+    {
+        _transport.LineError -= OnLineError;
+        return _transport.DisposeAsync();
+    }
 }

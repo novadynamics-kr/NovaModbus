@@ -18,6 +18,7 @@ public sealed class ModbusDataStore
     private int _slaveExceptionCount;
     private int _noResponseCount;
     private int _busyCount;
+    private int _nakCount;
     private int _eventCount;
 
     /// <summary>Initializes a store with the given capacities (defaults cover 0x0000-0xFFFF).</summary>
@@ -161,6 +162,9 @@ public sealed class ModbusDataStore
     /// <summary>Gets or sets the diagnostic register (FC08 sub 0x0002).</summary>
     public ushort DiagnosticRegister { get; set; }
 
+    /// <summary>Gets or sets listen-only mode (FC08 sub 0x0004 / 0x0001).</summary>
+    public bool ListenOnly { get; set; }
+
     /// <summary>Gets or sets the server identity string (FC11, ASCII).</summary>
     public string ServerIdentity { get; set; } = "NovaModbus";
 
@@ -290,6 +294,9 @@ public sealed class ModbusDataStore
     /// <summary>Gets the busy-response count for this ID.</summary>
     public int BusyCount => Volatile.Read(ref _busyCount);
 
+    /// <summary>Gets the NAK-response count for this ID (FC08 sub 0x0010).</summary>
+    public int NakCount => Volatile.Read(ref _nakCount);
+
     /// <summary>Gets the comm-event count for this ID.</summary>
     public int EventCount => Volatile.Read(ref _eventCount);
 
@@ -305,26 +312,64 @@ public sealed class ModbusDataStore
     /// <summary>Record a busy response.</summary>
     public void NoteBusy() => Interlocked.Increment(ref _busyCount);
 
+    /// <summary>Record a NAK response.</summary>
+    public void NoteNak() => Interlocked.Increment(ref _nakCount);
+
     /// <summary>Record a comm event and append a log byte.</summary>
-    public void NoteEvent(byte eventByte)
+    [Obsolete("Use NoteReceiveEvent/NoteSendEvent plus NoteEventCount (spec §6.10 semantics).")]
+    public void NoteEvent(byte eventByte) => NoteReceiveEvent(eventByte);
+
+    /// <summary>Append a receive-event byte (no counter change).</summary>
+    public void NoteReceiveEvent(byte eventByte)
+    {
+        lock (_sync)
+        {
+            AppendEvent(eventByte);
+        }
+    }
+
+    /// <summary>Append a send-event byte (no counter change).</summary>
+    public void NoteSendEvent(byte eventByte)
+    {
+        lock (_sync)
+        {
+            AppendEvent(eventByte);
+        }
+    }
+
+    /// <summary>Count one successful message completion (FC0B event counter).</summary>
+    public void NoteEventCount()
     {
         lock (_sync)
         {
             _eventCount++;
-            _eventLog.Enqueue(eventByte);
-            while (_eventLog.Count > ModbusLimits.MaxEventLogBytes)
-            {
-                _eventLog.Dequeue();
-            }
         }
     }
 
-    /// <summary>Snapshot of the comm event log (oldest first).</summary>
+    /// <summary>Reset the comm-event counter (FC08 sub 0x0001).</summary>
+    public void ResetEventCount()
+    {
+        lock (_sync)
+        {
+            _eventCount = 0;
+        }
+    }
+
+    private void AppendEvent(byte eventByte)
+    {
+        _eventLog.Enqueue(eventByte);
+        while (_eventLog.Count > ModbusLimits.MaxEventLogBytes)
+        {
+            _eventLog.Dequeue();
+        }
+    }
+
+    /// <summary>Snapshot of the comm event log (newest first, per spec §6.10).</summary>
     public byte[] ReadEventLog()
     {
         lock (_sync)
         {
-            return [.. _eventLog];
+            return [.. _eventLog.Reverse()];
         }
     }
 
@@ -346,6 +391,7 @@ public sealed class ModbusDataStore
             _slaveExceptionCount = 0;
             _noResponseCount = 0;
             _busyCount = 0;
+            _nakCount = 0;
             _eventCount = 0;
             DiagnosticRegister = 0;
         }
