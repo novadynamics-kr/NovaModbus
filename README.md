@@ -10,11 +10,23 @@ NovaModbus.slnx
 ├── src/NovaModbus.Rtu/ ...... 라이브러리 (net10.0, UI 의존성 없음)
 ├── src/NovaModbus.Client/ ... Modbus Client (WPF, net10.0-windows)
 ├── src/NovaModbus.Slave/ .... Slave 시뮬레이터, 멀티 ID (WPF)
-└── tests/NovaModbus.Rtu.Tests/ (MSTest, test 119)
+└── tests/NovaModbus.Rtu.Tests/ (MSTest, test 159)
 ```
 
 지원 Function: `01,02,03,04,05,06,07,08,0B,0C,0F,10,11,14,15,16,17,18` +
 Exception 응답 (`01-08,0A,0B`). 제외: `2B`/MEI, 사용자 정의 FC.
+브로드캐스트(주소 0) 쓰기 지원 (실행 후 무응답).
+
+## 규격 준수
+
+- MODBUS over Serial Line V1.02 + Application Protocol V1.1b3 대조
+  (`docs/tech/modbus-rtu-conformance.md` 매트릭스).
+- RTU 프레이밍: t3.5 분리·t1.5 문자간격 폐기·ADU 256B 상한,
+  19200 초과 시 고정 타이머 (1.75ms / 750µs).
+- 시리얼 기본값 Even 패리티 + 8 데이터비트 (11bit 문자 규칙 강제,
+  무패리티 시 2 stop bits). `SerialSettings.Validate()`로 검증.
+- 진단: FC08 서브펑션 (NAK·overrun·listen-only 포함),
+  FC11/12 상태·카운터·이벤트로그는 스펙 의미론 준수.
 
 ## 요구 사항
 
@@ -40,7 +52,7 @@ dotnet test tests/NovaModbus.Rtu.Tests --filter "FullyQualifiedName~Crc16"
 
 ## 라이브러리 사용법
 
-시리얼 연결:
+시리얼 연결 (기본 Even/8/1, 규칙 위반 시 예외):
 
 ```csharp
 using NovaModbus.Rtu;
@@ -52,6 +64,12 @@ await using var client = new ModbusRtuClient(port, baudRate: 9600);
 
 ushort[] regs = await client.ReadHoldingRegistersAsync(slaveId: 1, start: 0, count: 10);
 await client.WriteSingleCoilAsync(1, address: 7, on: true);
+```
+
+브로드캐스트 쓰기 (fire-and-forget, t3.5 quiet 자동 준수):
+
+```csharp
+await client.BroadcastWriteSingleRegisterAsync(address: 10, value: 0x55AA);
 ```
 
 가상 라인 (하드웨어 없이 Client↔Slave 연동 시험):
@@ -73,14 +91,15 @@ byte[]? response = slave.HandleRequest(requestWire); // null = 무응답
 ## Client / Slave 앱
 
 - **Client**: 좌측 시리얼 설정 (COM 목록·속도 선택/직접입력) + 연결,
-  Read/Write 탭 (18종 FC), Polling 탭, Raw Hex 로그 탭, Watch 탭
-  (ID·주소 목록 등록 + 값 전시). 내장 가상 슬레이브
-  (`VIRTUAL:nova-test-slave`)로 하드웨어 없이 전 기능 시험 가능.
-- **Slave**: 시리얼 리스너 + 멀티 ID 관리, Holding/Coils 편집,
-  요청 카운터, 에러 주입 (CRC 무시·Busy), 프레임 로그.
-  편집 데이터는 재시작 후에도 유지.
+  Read/Write 탭 (18종 FC), Polling 탭, Log 탭, Watch 탭
+  (등록 + 결과 2그리드, 체크박스·드래그·Ctrl+A 다중 선택, 전체삭제).
+  내장 가상 슬레이브 (`VIRTUAL:nova-test-slave`)로 하드웨어 없이 전 기능 시험 가능.
+- **Slave**: 시리얼 리스너 + 멀티 ID 관리, Holding/Coils 편집
+  (체크박스·드래그·Ctrl+A 다중 선택), Float 쓰기, 요청 카운터,
+  에러 주입 (CRC 무시·Busy), 프레임 로그, 맵 저장/불러오기.
 
 ## 문서
 
 - `AGENTS.md` — 에이전트 작업 규칙 (빌드·컨벤션·제약)
 - `docs/` — 작업 기록 (orders/plans/working/report/feedback/tech/troubleshootings)
+- `docs/tech/modbus-rtu-conformance.md` — Modbus 규격 적합성 매트릭스
