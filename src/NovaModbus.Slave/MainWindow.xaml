@@ -4,6 +4,7 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:NovaModbus.Slave"
+        xmlns:helpers="clr-namespace:NovaModbus.Slave.Helpers"
         mc:Ignorable="d"
         Title="NovaModbus Slave" Height="600" Width="900">
     <Grid>
@@ -122,8 +123,14 @@
                                     Command="{Binding AddHoldingCommand}"/>
                             <Button Content="Add Range" Padding="16,2" Margin="0,0,4,1"
                                     Command="{Binding AddHoldingRangeCommand}"/>
-                            <Button Content="Del" Padding="16,2" Margin="0,0,8,1"
+                            <Button Content="Del" Padding="16,2" Margin="0,0,4,1"
                                     Click="OnHoldingDelete"/>
+                            <Button Content="Select All" Padding="16,2" Margin="0,0,4,1"
+                                    Command="{Binding SelectAllHoldingsCommand}"
+                                    ToolTip="Select all holding rows (Ctrl+A)"/>
+                            <Button Content="Deselect All" Padding="16,2" Margin="0,0,4,1"
+                                    Command="{Binding DeselectAllHoldingsCommand}"
+                                    ToolTip="Clear holding selection"/>
                             <Button Content="Save" Padding="16,2" Margin="0,0,4,1"
                                     Command="{Binding SaveMapCommand}"/>
                             <Button Content="Load" Padding="16,2" Margin="0,0,0,1"
@@ -135,11 +142,35 @@
                                  Value="{Binding BulkProgress, Mode=OneWay}"/>
                     <DataGrid Grid.Row="2" Margin="0,8,0,0" Name="HoldingGrid"
                               AutoGenerateColumns="False" IsReadOnly="False"
-                              SelectionMode="Extended"
+                              SelectionMode="Single"
                               ItemsSource="{Binding HoldingRows}"
                               KeyDown="OnGridDeleteKey"
-                              MouseRightButtonUp="OnHoldingRightClick">
+                              MouseRightButtonUp="OnHoldingRightClick"
+                              EnableRowVirtualization="True"
+                              VirtualizingPanel.IsVirtualizing="True"
+                              VirtualizingPanel.VirtualizationMode="Recycling"
+                              VirtualizingPanel.CacheLength="3,3"
+                              VirtualizingPanel.CacheLengthUnit="Page"
+                              ScrollViewer.CanContentScroll="True"
+                              helpers:DataGridDragSelect.IsEnabled="True">
+                        <DataGrid.RowStyle>
+                            <Style TargetType="DataGridRow">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                        <Setter Property="Background" Value="#CCE8FF"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </DataGrid.RowStyle>
                         <DataGrid.Columns>
+                            <DataGridTemplateColumn Header="✓" Width="30">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                  HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
                             <DataGridTextColumn Header="Address" Binding="{Binding Address, Mode=OneWay}" IsReadOnly="True"/>
                             <DataGridTextColumn Header="AddressHex" Binding="{Binding AddressHex, Mode=OneWay}" IsReadOnly="True"/>
                             <DataGridTextColumn Header="Value(Dec)" Binding="{Binding ValueText, UpdateSourceTrigger=LostFocus}" Width="*"/>
@@ -169,8 +200,14 @@
                                     Command="{Binding AddCoilCommand}"/>
                             <Button Content="Add Range" Padding="16,2" Margin="0,0,4,1"
                                     Command="{Binding AddCoilRangeCommand}"/>
-                            <Button Content="Del" Padding="16,2" Margin="0,0,0,1"
+                            <Button Content="Del" Padding="16,2" Margin="0,0,4,1"
                                     Click="OnCoilDelete"/>
+                            <Button Content="Select All" Padding="16,2" Margin="0,0,4,1"
+                                    Command="{Binding SelectAllCoilsCommand}"
+                                    ToolTip="Select all coil rows (Ctrl+A)"/>
+                            <Button Content="Deselect All" Padding="16,2" Margin="0,0,4,1"
+                                    Command="{Binding DeselectAllCoilsCommand}"
+                                    ToolTip="Clear coil selection"/>
                         </StackPanel>
                     </StackPanel>
                     <ProgressBar Grid.Row="1" Margin="0,8,0,0" Height="10"
@@ -178,10 +215,34 @@
                                  Value="{Binding BulkProgress, Mode=OneWay}"/>
                     <DataGrid Grid.Row="2" Margin="0,8,0,0" Name="CoilGrid"
                               AutoGenerateColumns="False"
-                              SelectionMode="Extended"
+                              SelectionMode="Single"
                               ItemsSource="{Binding CoilRows}"
-                              KeyDown="OnGridDeleteKey">
+                              KeyDown="OnGridDeleteKey"
+                              EnableRowVirtualization="True"
+                              VirtualizingPanel.IsVirtualizing="True"
+                              VirtualizingPanel.VirtualizationMode="Recycling"
+                              VirtualizingPanel.CacheLength="3,3"
+                              VirtualizingPanel.CacheLengthUnit="Page"
+                              ScrollViewer.CanContentScroll="True"
+                              helpers:DataGridDragSelect.IsEnabled="True">
+                        <DataGrid.RowStyle>
+                            <Style TargetType="DataGridRow">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                        <Setter Property="Background" Value="#CCE8FF"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </DataGrid.RowStyle>
                         <DataGrid.Columns>
+                            <DataGridTemplateColumn Header="✓" Width="30">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                  HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
                             <DataGridTextColumn Header="Address" Binding="{Binding Address, Mode=OneWay}" IsReadOnly="True"/>
                             <DataGridCheckBoxColumn Header="On" Binding="{Binding IsOn, UpdateSourceTrigger=PropertyChanged}" Width="*"/>
                         </DataGrid.Columns>

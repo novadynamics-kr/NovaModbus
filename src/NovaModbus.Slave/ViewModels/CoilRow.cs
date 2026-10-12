@@ -1,10 +1,14 @@
 namespace NovaModbus.Slave.ViewModels;
 
+using NovaModbus.Rtu.Collections;
+
 /// <summary>Editable coil row writing through to the store.</summary>
-public sealed class CoilRow : ViewModelBase
+public sealed class CoilRow : ViewModelBase, ISelectable
 {
     private readonly Action<ushort, bool> _commit;
     private bool _isOn;
+    private bool _isSelected;
+    private bool _suppressSelectionNotification;
 
     /// <summary>Initializes a row.</summary>
     public CoilRow(ushort address, bool isOn, Action<ushort, bool> commit)
@@ -40,5 +44,29 @@ public sealed class CoilRow : ViewModelBase
                 NotifyPropertyChanged();
             }
         }
+    }
+
+    /// <summary>Selection state for batched UI selection.</summary>
+    public bool IsSelected
+    {
+        get => _isSelected;
+        set
+        {
+            if (_isSelected != value)
+            {
+                _isSelected = value;
+                if (!_suppressSelectionNotification)
+                {
+                    NotifyPropertyChanged(nameof(IsSelected));
+                }
+            }
+        }
+    }
+
+    /// <inheritdoc />
+    public bool SuppressSelectionNotification
+    {
+        get => _suppressSelectionNotification;
+        set => _suppressSelectionNotification = value;
     }
 }

@@ -1,10 +1,14 @@
 namespace NovaModbus.Slave.ViewModels;
 
+using NovaModbus.Rtu.Collections;
+
 /// <summary>Editable holding-register row writing through to the store.</summary>
-public sealed class RegisterRow : ViewModelBase
+public sealed class RegisterRow : ViewModelBase, ISelectable
 {
     private readonly Action<ushort, ushort> _commit;
     private string _valueText;
+    private bool _isSelected;
+    private bool _suppressSelectionNotification;
 
     /// <summary>Initializes a row.</summary>
     public RegisterRow(ushort address, ushort value, Action<ushort, ushort> commit)
@@ -65,5 +69,29 @@ public sealed class RegisterRow : ViewModelBase
                 NotifyPropertyChanged();
             }
         }
+    }
+
+    /// <summary>Selection state for batched UI selection.</summary>
+    public bool IsSelected
+    {
+        get => _isSelected;
+        set
+        {
+            if (_isSelected != value)
+            {
+                _isSelected = value;
+                if (!_suppressSelectionNotification)
+                {
+                    NotifyPropertyChanged(nameof(IsSelected));
+                }
+            }
+        }
+    }
+
+    /// <inheritdoc />
+    public bool SuppressSelectionNotification
+    {
+        get => _suppressSelectionNotification;
+        set => _suppressSelectionNotification = value;
     }
 }

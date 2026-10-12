@@ -1,7 +1,10 @@
 namespace NovaModbus.Client.ViewModels;
 
+using System.ComponentModel;
+using NovaModbus.Rtu.Collections;
+
 /// <summary>Display row for one <see cref="WatchEntry"/>.</summary>
-public sealed class WatchResult : ViewModelBase
+public sealed class WatchResult : ViewModelBase, ISelectable
 {
     private string _valueDecText = "-";
     private string _valueHexText = "—";
@@ -13,10 +16,34 @@ public sealed class WatchResult : ViewModelBase
     {
         ArgumentNullException.ThrowIfNull(entry);
         Entry = entry;
+        Entry.PropertyChanged += OnEntryChanged;
     }
 
     /// <summary>Watched address range.</summary>
     public WatchEntry Entry { get; }
+
+    /// <summary>Selection state (delegated to the entry: both grids stay in sync).</summary>
+    public bool IsSelected
+    {
+        get => Entry.IsSelected;
+        set => Entry.IsSelected = value;
+    }
+
+    /// <inheritdoc />
+    public bool SuppressSelectionNotification
+    {
+        get => Entry.SuppressSelectionNotification;
+        set => Entry.SuppressSelectionNotification = value;
+    }
+
+    private void OnEntryChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        // Forward so the results grid refreshes when the entry is (de)selected elsewhere.
+        if (e.PropertyName == nameof(WatchEntry.IsSelected))
+        {
+            NotifyPropertyChanged(nameof(IsSelected));
+        }
+    }
 
     /// <summary>Decimal values.</summary>
     public string ValueDecText

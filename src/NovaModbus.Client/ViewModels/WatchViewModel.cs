@@ -1,7 +1,10 @@
 using System.Collections.ObjectModel;
+using System.ComponentModel;
+using System.Windows.Data;
 using NovaModbus.Client.Services;
 using NovaModbus.Rtu;
 using NovaModbus.Rtu.Codecs;
+using NovaModbus.Rtu.Collections;
 using NovaModbus.Rtu.Commands;
 
 namespace NovaModbus.Client.ViewModels;
@@ -27,6 +30,9 @@ public sealed class WatchViewModel : ViewModelBase, IDisposable
         ReadAllCommand = new AsyncRelayCommand(ReadAllAsync, () => !IsBusy, OnError);
         SaveWatchCommand = new RelayCommand(SaveWatch);
         LoadWatchCommand = new RelayCommand(LoadWatch);
+        ClearAllCommand = new RelayCommand(ClearAll);
+        SelectAllCommand = new RelayCommand(SelectAll);
+        DeselectAllCommand = new RelayCommand(DeselectAll);
     }
 
     /// <summary>Supported areas.</summary>
@@ -46,24 +52,30 @@ public sealed class WatchViewModel : ViewModelBase, IDisposable
     ];
 
     /// <summary>Registered entries.</summary>
-    public ObservableCollection<WatchEntry> Entries
+    public BulkObservableCollection<WatchEntry> Entries
     {
         get => _entries;
         private set => SetProperty(ref _entries, value);
     }
 
-    private ObservableCollection<WatchEntry> _entries = [];
+    private BulkObservableCollection<WatchEntry> _entries = [];
 
     /// <summary>Result rows (1:1 with entries).</summary>
-    public ObservableCollection<WatchResult> Results
+    public BulkObservableCollection<WatchResult> Results
     {
         get => _results;
         private set => SetProperty(ref _results, value);
     }
 
-    private ObservableCollection<WatchResult> _results = [];
+    private BulkObservableCollection<WatchResult> _results = [];
 
     private readonly HashSet<WatchEntry> _entryIndex = [];
+
+    /// <summary>Select all entries (sets IsSelected = true on all).</summary>
+    public RelayCommand SelectAllCommand { get; }
+
+    /// <summary>Deselect all entries (sets IsSelected = false on all).</summary>
+    public RelayCommand DeselectAllCommand { get; }
 
     /// <summary>Bulk operation progress (0-100).</summary>
     public double BulkProgress
@@ -145,6 +157,9 @@ public sealed class WatchViewModel : ViewModelBase, IDisposable
     /// <summary>Load the watch list from a JSON file (replaces current).</summary>
     public RelayCommand LoadWatchCommand { get; }
 
+    /// <summary>Clear all entries and results.</summary>
+    public RelayCommand ClearAllCommand { get; }
+
     /// <summary>Read all entries once.</summary>
     public AsyncRelayCommand ReadAllCommand { get; }
 
@@ -200,7 +215,7 @@ public sealed class WatchViewModel : ViewModelBase, IDisposable
     public string StatusText
     {
         get => _statusText;
-        private set => SetProperty(ref _statusText, value);
+        set => SetProperty(ref _statusText, value);
     }
 
     private string _statusText = string.Empty;
@@ -242,17 +257,61 @@ public sealed class WatchViewModel : ViewModelBase, IDisposable
             return;
         }
 
-        foreach (WatchResult row in Results.Where(r => doomed.Contains(r.Entry)).ToArray())
+        // Build new collections excluding the doomed entries.
+        List<WatchEntry> newEntries = [];
+        List<WatchResult> newResults = [];
+        foreach (WatchEntry entry in Entries)
         {
-            Results.Remove(row);
+            if (!doomed.Contains(entry))
+            {
+                newEntries.Add(entry);
+            }
+        }
+        foreach (WatchResult result in Results)
+        {
+            if (!doomed.Contains(result.Entry))
+            {
+                newResults.Add(result);
+            }
         }
 
-        foreach (WatchEntry entry in Entries.Where(doomed.Contains).ToArray())
-        {
-            Entries.Remove(entry);
-            _entryIndex.Remove(entry);
-        }
+        // Update collections and index using bulk replacement (single notification).
+        Entries.ReplaceAll(newEntries);
+        Results.ReplaceAll(newResults);
+        _entryIndex.ExceptWith(doomed);
     }
+
+    /// <summary>Clear all entries and results in one operation.</summary>
+    public void ClearAll()
+    {
+        Entries.ReplaceAll([]);
+        Results.ReplaceAll([]);
+        _entryIndex.Clear();
+        StatusText = "Cleared all entries.";
+    }
+
+    /// <summary>Select or clear all entries inside a deferred view refresh (single render pass).</summary>
+    public void SelectAllItems(bool select)
+    {
+        ICollectionView entriesView = CollectionViewSource.GetDefaultView(Entries);
+        ICollectionView resultsView = CollectionViewSource.GetDefaultView(Results);
+        using (entriesView.DeferRefresh())
+        using (resultsView.DeferRefresh())
+        {
+            Entries.SetAllSelected(select);
+            // Results mirror Entry.IsSelected via forwarding, which is suppressed during
+            // the bulk set: rebind realized result rows with a single Reset.
+            Results.Refresh();
+        }
+
+        StatusText = select ? $"All {Entries.Count} entries selected." : "Selection cleared.";
+    }
+
+    /// <summary>Select all entries (sets IsSelected = true).</summary>
+    public void SelectAll() => SelectAllItems(true);
+
+    /// <summary>Deselect all entries (sets IsSelected = false).</summary>
+    public void DeselectAll() => SelectAllItems(false);
 
     private void SaveWatch()
     {
@@ -303,8 +362,8 @@ public sealed class WatchViewModel : ViewModelBase, IDisposable
                 }
             }
 
-            Entries = new ObservableCollection<WatchEntry>(entries);
-            Results = new ObservableCollection<WatchResult>(rows);
+            Entries.ReplaceAll(entries);
+            Results.ReplaceAll(rows);
 
             StatusText = $"Loaded {loaded.Length} entries from {dialog.FileName}.";
         }
@@ -331,7 +390,7 @@ public sealed class WatchViewModel : ViewModelBase, IDisposable
                 return;
             }
 
-            foreach (WatchResult row in Results.ToArray())
+            foreach (WatchResult row in Results)
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 await ReadOneAsync(client, row, cancellationToken).ConfigureAwait(false);
@@ -578,7 +637,7 @@ public sealed class WatchViewModel : ViewModelBase, IDisposable
                 return;
             }
 
-            if (end - start + 1 > ModbusLimits.MaxBulkAdd)
+            if (end - start > ModbusLimits.MaxBulkAdd)
             {
                 StatusText = $"Range too large (max {ModbusLimits.MaxBulkAdd}).";
                 return;
@@ -626,11 +685,9 @@ public sealed class WatchViewModel : ViewModelBase, IDisposable
             // Intentionally UI-affine below (no ConfigureAwait(false)):
             // bound Entries/Results must mutate on the UI thread.
 
-            foreach (WatchEntry entry in fresh)
-            {
-                Entries.Add(entry);
-                Results.Add(new WatchResult(entry));
-            }
+            // Merge fresh entries into existing collections using bulk add (single notification).
+            Entries.AddRange(fresh);
+            Results.AddRange(fresh.Select(e => new WatchResult(e)));
 
             StatusText = $"Added {fresh.Count}, skipped {end - start + 1 - fresh.Count}.";
         }
