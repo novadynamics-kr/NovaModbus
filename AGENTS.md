@@ -103,6 +103,8 @@ Logging/ — IModbusLogger (Action<string> 기반, 외부 로거 의존 없음)
 - UI 스레드 규칙 (트러블슈팅 `docs/troubleshootings/cross-thread-command.md`):
   `INotifyPropertyChanged` 쓰기는 어느 스레드든 가능 (바인딩 엔진이 마샬).
   `ObservableCollection`, `CanExecuteChanged`, UI 직접 접근은 UI 스레드 강제.
+  바인딩 컬렉션의 읽기(`ToArray` 포함)도 UI 스레드에서 — 루프 오케스트레이션은
+  `ConfigureAwait(false)` 없이 UI 어피니티 유지 (무거운 작업만 `Task.Run`).
   새 `ICommand`는 `Rtu.Commands` 사용 (생성 시점 컨텍스트 캡처·마샬 내장).
   `ObservableLogger`는 Dispatcher 마샬済. 테스트에서 커스텀 컨텍스트 하에
   `await` 금지 (continuation이 Drain을 기다려 데드락 — 블로킹 대기 사용).

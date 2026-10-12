@@ -28,23 +28,38 @@ public partial class MainWindow : Window
         }
     }
 
-    private void OnHoldingDelete(object sender, RoutedEventArgs e) =>
-        DeleteFrom(HoldingGrid, ViewModel.RemoveHoldings, item => ((RegisterRow)item).Address);
-
-    private void OnCoilDelete(object sender, RoutedEventArgs e) =>
-        DeleteFrom(CoilGrid, ViewModel.RemoveCoils, item => ((CoilRow)item).Address);
-
-    private static void DeleteFrom(DataGrid grid, Action<IEnumerable<ushort>> remove, Func<object, ushort> addressOf)
+    private void OnHoldingDelete(object sender, RoutedEventArgs e)
     {
-        ushort[] addresses = grid.SelectedItems.Cast<object>().Select(addressOf).ToArray();
-        if (addresses.Length > 0)
+        // Use IsSelected property instead of DataGrid SelectedItems
+        var toDelete = ViewModel.HoldingRows.Where(x => x.IsSelected).Select(x => x.Address).ToArray();
+        if (toDelete.Length > 0)
         {
-            remove(addresses);
+            ViewModel.RemoveHoldings(toDelete);
+        }
+    }
+
+    private void OnCoilDelete(object sender, RoutedEventArgs e)
+    {
+        var toDelete = ViewModel.CoilRows.Where(x => x.IsSelected).Select(x => x.Address).ToArray();
+        if (toDelete.Length > 0)
+        {
+            ViewModel.RemoveCoils(toDelete);
         }
     }
 
     private void OnGridDeleteKey(object sender, KeyEventArgs e)
     {
+        if (e.Key == Key.A && (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control)
+        {
+            // Ctrl+A: use ViewModel command (instant, no UI freeze)
+            if (sender == HoldingGrid)
+                ViewModel.SelectAllHoldingsCommand.Execute(null);
+            else if (sender == CoilGrid)
+                ViewModel.SelectAllCoilsCommand.Execute(null);
+            e.Handled = true;
+            return;
+        }
+
         if (e.Key != Key.Delete)
         {
             return;

@@ -1,4 +1,5 @@
 ﻿using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Input;
 using NovaModbus.Client.ViewModels;
 
@@ -25,6 +26,17 @@ public partial class MainWindow : Window
 
     private void OnWatchDeleteKey(object sender, KeyEventArgs e)
     {
+        if (e.Key == Key.A && (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control)
+        {
+            // Ctrl+A: use ViewModel command (instant, no UI freeze)
+            if (DataContext is MainViewModel vm)
+            {
+                vm.Watch.SelectAllCommand.Execute(null);
+            }
+            e.Handled = true;
+            return;
+        }
+
         if (e.Key != Key.Delete)
         {
             return;
@@ -37,7 +49,12 @@ public partial class MainWindow : Window
     {
         if (DataContext is MainViewModel vm)
         {
-            vm.Watch.RemoveEntries(WatchGrid.SelectedItems.OfType<WatchEntry>());
+            // Use IsSelected property instead of DataGrid SelectedItems
+            var toDelete = vm.Watch.Entries.Where(x => x.IsSelected).ToArray();
+            if (toDelete.Length > 0)
+            {
+                vm.Watch.RemoveEntries(toDelete);
+            }
             e.Handled = true;
         }
     }

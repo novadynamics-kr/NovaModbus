@@ -4,6 +4,7 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:NovaModbus.Client"
+        xmlns:helpers="clr-namespace:NovaModbus.Client.Helpers"
         mc:Ignorable="d"
         Title="NovaModbus Client" Height="600" Width="900">
     <Grid>
@@ -180,6 +181,15 @@
                                     Command="{Binding AddRangeCommand}"/>
                             <Button Content="Del" Padding="16,2" Margin="0,0,4,1"
                                     Click="OnWatchDelete"/>
+                            <Button Content="Clear All" Padding="16,2" Margin="0,0,4,1"
+                                    Command="{Binding ClearAllCommand}"
+                                    ToolTip="Remove all entries and results (single operation)"/>
+                            <Button Content="Select All" Padding="16,2" Margin="0,0,4,1"
+                                    Command="{Binding SelectAllCommand}"
+                                    ToolTip="Select all entries (Ctrl+A)"/>
+                            <Button Content="Deselect All" Padding="16,2" Margin="0,0,4,1"
+                                    Command="{Binding DeselectAllCommand}"
+                                    ToolTip="Clear selection"/>
                             <Button Content="Save" Padding="16,2" Margin="0,0,4,1"
                                     Command="{Binding SaveWatchCommand}"/>
                             <Button Content="Load" Padding="16,2" Margin="0,0,0,1"
@@ -204,10 +214,34 @@
 
                     <DataGrid Grid.Row="2" Margin="0,8,0,0" Name="WatchGrid"
                               AutoGenerateColumns="False" CanUserDeleteRows="False"
-                              IsReadOnly="True" ItemsSource="{Binding Entries}"
-                              SelectionMode="Extended"
-                              KeyDown="OnWatchDeleteKey">
+                              IsReadOnly="False" ItemsSource="{Binding Entries}"
+                              SelectionMode="Single"
+                              KeyDown="OnWatchDeleteKey"
+                              EnableRowVirtualization="True"
+                              VirtualizingPanel.IsVirtualizing="True"
+                              VirtualizingPanel.VirtualizationMode="Recycling"
+                              VirtualizingPanel.CacheLength="3,3"
+                              VirtualizingPanel.CacheLengthUnit="Page"
+                              ScrollViewer.CanContentScroll="True"
+                              helpers:DataGridDragSelect.IsEnabled="True">
+                        <DataGrid.RowStyle>
+                            <Style TargetType="DataGridRow">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                        <Setter Property="Background" Value="#CCE8FF"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </DataGrid.RowStyle>
                         <DataGrid.Columns>
+                            <DataGridTemplateColumn Header="✓" Width="30">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                  HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
                             <DataGridTextColumn Header="Slave" Binding="{Binding SlaveId}"/>
                             <DataGridTextColumn Header="Area" Binding="{Binding Area}"/>
                             <DataGridTextColumn Header="Address" Binding="{Binding Start}"/>
@@ -217,10 +251,36 @@
                         </DataGrid.Columns>
                     </DataGrid>
 
-                    <DataGrid Grid.Row="3" Margin="0,8,0,0" AutoGenerateColumns="False"
+                    <DataGrid x:Name="WatchValueGrid" Grid.Row="3" Margin="0,8,0,0" AutoGenerateColumns="False"
                               CanUserDeleteRows="False"
-                              IsReadOnly="True" ItemsSource="{Binding Results}">
+                              IsReadOnly="True" ItemsSource="{Binding Results}"
+                              SelectionMode="Single"
+                              KeyDown="OnWatchDeleteKey"
+                              EnableRowVirtualization="True"
+                              VirtualizingPanel.IsVirtualizing="True"
+                              VirtualizingPanel.VirtualizationMode="Recycling"
+                              VirtualizingPanel.CacheLength="3,3"
+                              VirtualizingPanel.CacheLengthUnit="Page"
+                              ScrollViewer.CanContentScroll="True"
+                              helpers:DataGridDragSelect.IsEnabled="True">
+                        <DataGrid.RowStyle>
+                            <Style TargetType="DataGridRow">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                        <Setter Property="Background" Value="#CCE8FF"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </DataGrid.RowStyle>
                         <DataGrid.Columns>
+                            <DataGridTemplateColumn Header="✓" Width="30">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                  HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
                             <DataGridTextColumn Header="Slave" Binding="{Binding Entry.SlaveId}"/>
                             <DataGridTextColumn Header="Area" Binding="{Binding Entry.Area}"/>
                             <DataGridTextColumn Header="Address" Binding="{Binding Entry.Start}"/>

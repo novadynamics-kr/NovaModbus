@@ -1,9 +1,12 @@
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Globalization;
 using System.IO;
+using System.Windows.Data;
 using System.Windows.Threading;
 using NovaModbus.Rtu;
 using NovaModbus.Rtu.Codecs;
+using NovaModbus.Rtu.Collections;
 using NovaModbus.Rtu.Commands;
 using NovaModbus.Rtu.Transport;
 using NovaModbus.Slave.Services;
@@ -54,6 +57,10 @@ public sealed class MainViewModel : ViewModelBase, IAsyncDisposable
         AddCoilRangeCommand = new AsyncRelayCommand(AddCoilRangeAsync, () => !IsBulkWorking, OnError);
         SaveMapCommand = new RelayCommand(SaveMap);
         LoadMapCommand = new RelayCommand(LoadMap);
+        SelectAllHoldingsCommand = new RelayCommand(SelectAllHoldings);
+        DeselectAllHoldingsCommand = new RelayCommand(DeselectAllHoldings);
+        SelectAllCoilsCommand = new RelayCommand(SelectAllCoils);
+        DeselectAllCoilsCommand = new RelayCommand(DeselectAllCoils);
         _counterTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
         _counterTimer.Tick += (_, _) => RefreshCounters();
         _counterTimer.Start();
@@ -92,22 +99,22 @@ public sealed class MainViewModel : ViewModelBase, IAsyncDisposable
     }
 
     /// <summary>Holding-register editor rows for the selected ID.</summary>
-    public ObservableCollection<RegisterRow> HoldingRows
+    public BulkObservableCollection<RegisterRow> HoldingRows
     {
         get => _holdingRows;
         private set => SetProperty(ref _holdingRows, value);
     }
 
-    private ObservableCollection<RegisterRow> _holdingRows = [];
+    private BulkObservableCollection<RegisterRow> _holdingRows = [];
 
     /// <summary>Coil editor rows for the selected ID.</summary>
-    public ObservableCollection<CoilRow> CoilRows
+    public BulkObservableCollection<CoilRow> CoilRows
     {
         get => _coilRows;
         private set => SetProperty(ref _coilRows, value);
     }
 
-    private ObservableCollection<CoilRow> _coilRows = [];
+    private BulkObservableCollection<CoilRow> _coilRows = [];
 
     /// <summary>Bulk operation progress (0-100).</summary>
     public double BulkProgress
@@ -141,7 +148,7 @@ public sealed class MainViewModel : ViewModelBase, IAsyncDisposable
     public string StatusText
     {
         get => _statusText;
-        private set => SetProperty(ref _statusText, value);
+        set => SetProperty(ref _statusText, value);
     }
 
     /// <summary>Whether the listener runs.</summary>
@@ -184,6 +191,18 @@ public sealed class MainViewModel : ViewModelBase, IAsyncDisposable
 
     /// <summary>Remove the selected slave ID.</summary>
     public RelayCommand RemoveSlaveCommand { get; }
+
+    /// <summary>Select all holding register rows.</summary>
+    public RelayCommand SelectAllHoldingsCommand { get; }
+
+    /// <summary>Deselect all holding register rows.</summary>
+    public RelayCommand DeselectAllHoldingsCommand { get; }
+
+    /// <summary>Select all coil rows.</summary>
+    public RelayCommand SelectAllCoilsCommand { get; }
+
+    /// <summary>Deselect all coil rows.</summary>
+    public RelayCommand DeselectAllCoilsCommand { get; }
 
     /// <summary>New holding address text.</summary>
     public string HoldingAddressText
@@ -418,8 +437,8 @@ public sealed class MainViewModel : ViewModelBase, IAsyncDisposable
             coilRows.Add(new CoilRow(address, store.ReadCoils(address, 1)[0], store.WriteCoil));
         }
 
-        HoldingRows = new ObservableCollection<RegisterRow>(holdingRows);
-        CoilRows = new ObservableCollection<CoilRow>(coilRows);
+        HoldingRows = new BulkObservableCollection<RegisterRow>(holdingRows);
+        CoilRows = new BulkObservableCollection<CoilRow>(coilRows);
     }
 
     private void AddHolding()
@@ -445,7 +464,9 @@ public sealed class MainViewModel : ViewModelBase, IAsyncDisposable
             store.WriteHolding(address, value);
             map[address] = value;
             StatusText = string.Empty;
-            RefreshRows();
+            var newRow = new RegisterRow(address, value, (addr, val) => store.WriteHolding(addr, val));
+            int index = FindInsertionIndex(HoldingRows, r => r.Address, address);
+            HoldingRows.Insert(index, newRow);
         }
         catch (Exception ex)
         {
@@ -467,7 +488,7 @@ public sealed class MainViewModel : ViewModelBase, IAsyncDisposable
             map.Remove(address);
         }
 
-        RefreshRows();
+        HoldingRows.RemoveRange(HoldingRows.Where(r => addresses.Contains(r.Address)));
     }
 
     /// <summary>Remove coils from the map (multi-select).</summary>
@@ -484,8 +505,44 @@ public sealed class MainViewModel : ViewModelBase, IAsyncDisposable
             map.Remove(address);
         }
 
-        RefreshRows();
+        CoilRows.RemoveRange(CoilRows.Where(r => addresses.Contains(r.Address)));
     }
+
+    /// <summary>Select or clear all holding-register rows inside a deferred view refresh.</summary>
+    public void SetHoldingsSelected(bool select)
+    {
+        ICollectionView view = CollectionViewSource.GetDefaultView(HoldingRows);
+        using (view.DeferRefresh())
+        {
+            HoldingRows.SetAllSelected(select);
+        }
+
+        StatusText = select ? $"All {HoldingRows.Count} holding entries selected." : "Holding selection cleared.";
+    }
+
+    /// <summary>Select all holding register rows.</summary>
+    public void SelectAllHoldings() => SetHoldingsSelected(true);
+
+    /// <summary>Deselect all holding register rows.</summary>
+    public void DeselectAllHoldings() => SetHoldingsSelected(false);
+
+    /// <summary>Select or clear all coil rows inside a deferred view refresh.</summary>
+    public void SetCoilsSelected(bool select)
+    {
+        ICollectionView view = CollectionViewSource.GetDefaultView(CoilRows);
+        using (view.DeferRefresh())
+        {
+            CoilRows.SetAllSelected(select);
+        }
+
+        StatusText = select ? $"All {CoilRows.Count} coil entries selected." : "Coil selection cleared.";
+    }
+
+    /// <summary>Select all coil rows.</summary>
+    public void SelectAllCoils() => SetCoilsSelected(true);
+
+    /// <summary>Deselect all coil rows.</summary>
+    public void DeselectAllCoils() => SetCoilsSelected(false);
 
     private void AddCoil()
     {
@@ -507,7 +564,10 @@ public sealed class MainViewModel : ViewModelBase, IAsyncDisposable
             }
 
             StatusText = string.Empty;
-            RefreshRows();
+            bool value = store.ReadCoils(address, 1)[0];
+            var newRow = new CoilRow(address, value, store.WriteCoil);
+            int index = FindInsertionIndex(CoilRows, r => r.Address, address);
+            CoilRows.Insert(index, newRow);
         }
         catch (Exception ex)
         {
@@ -532,7 +592,7 @@ public sealed class MainViewModel : ViewModelBase, IAsyncDisposable
                 return;
             }
 
-            if (end - start + 1 > ModbusLimits.MaxBulkAdd)
+            if (end - start > ModbusLimits.MaxBulkAdd)
             {
                 StatusText = $"Range too large (max {ModbusLimits.MaxBulkAdd}).";
                 return;
@@ -556,7 +616,16 @@ public sealed class MainViewModel : ViewModelBase, IAsyncDisposable
             }
         }, cancellationToken).ConfigureAwait(false);
         StatusText = $"Added range {start}-{end}.";
-        RefreshRows();
+        store = RequireStore();
+        // Rebuild HoldingRows from the updated map using BulkObservableCollection.
+        var addresses = map.Keys.OrderBy(a => a).ToList();
+        var rows = new List<RegisterRow>(addresses.Count);
+        foreach (ushort addr in addresses)
+        {
+            ushort val = store.ReadHolding(addr, 1)[0];
+            rows.Add(new RegisterRow(addr, val, (a, v) => store.WriteHolding(a, v)));
+        }
+        HoldingRows = new BulkObservableCollection<RegisterRow>(rows);
     }
 
     private async Task AddCoilRangeAsync(CancellationToken cancellationToken)
@@ -575,7 +644,7 @@ public sealed class MainViewModel : ViewModelBase, IAsyncDisposable
                 return;
             }
 
-            if (end - start + 1 > ModbusLimits.MaxBulkAdd)
+            if (end - start > ModbusLimits.MaxBulkAdd)
             {
                 StatusText = $"Range too large (max {ModbusLimits.MaxBulkAdd}).";
                 return;
@@ -590,7 +659,16 @@ public sealed class MainViewModel : ViewModelBase, IAsyncDisposable
         HashSet<ushort> map = _coilMaps[SelectedSlaveId!.Value];
         await RunBulkAsync(start, end, a => map.Add(a), cancellationToken).ConfigureAwait(false);
         StatusText = $"Added range {start}-{end}.";
-        RefreshRows();
+        store = RequireStore();
+        // Rebuild CoilRows from the updated map using BulkObservableCollection.
+        var addresses = map.OrderBy(a => a).ToList();
+        var rows = new List<CoilRow>(addresses.Count);
+        foreach (ushort addr in addresses)
+        {
+            bool val = store.ReadCoils(addr, 1)[0];
+            rows.Add(new CoilRow(addr, val, store.WriteCoil));
+        }
+        CoilRows = new BulkObservableCollection<CoilRow>(rows);
     }
 
     private async Task RunBulkAsync(ushort start, ushort end, Action<ushort> work, CancellationToken ct)
@@ -813,6 +891,19 @@ public sealed class MainViewModel : ViewModelBase, IAsyncDisposable
         {
             StatusText = $"Error: {ex.Message}";
         }
+    }
+
+
+    private static int FindInsertionIndex<T>(IList<T> items, Func<T, ushort> addressSelector, ushort address)
+    {
+        for (int i = 0; i < items.Count; i++)
+        {
+            if (addressSelector(items[i]) > address)
+            {
+                return i;
+            }
+        }
+        return items.Count;
     }
 
     /// <inheritdoc />
