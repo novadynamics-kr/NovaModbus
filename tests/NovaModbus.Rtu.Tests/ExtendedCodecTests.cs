@@ -1,11 +1,23 @@
 using NovaModbus.Rtu.Codecs;
 using NovaModbus.Rtu.Enums;
+using NovaModbus.Rtu.Errors;
+using NovaModbus.Rtu.Tests.Testing;
 
 namespace NovaModbus.Rtu.Tests;
 
 [TestClass]
 public sealed class ExtendedCodecTests
 {
+    private static ModbusExceptionCode DecodeException(byte[]? response, byte baseFunction)
+    {
+        Assert.IsNotNull(response);
+        Assert.IsTrue(ModbusFrame.TryDecode(response, out ModbusFrame? frame));
+        Assert.IsNotNull(frame);
+        Assert.IsTrue(frame.IsException);
+        Assert.AreEqual((byte)(baseFunction | 0x80), frame.Function);
+        return ExceptionCodec.Decode(frame.Data);
+    }
+
     [TestMethod]
     public void ExceptionStatusRoundTrip()
     {
@@ -143,6 +155,67 @@ public sealed class ExtendedCodecTests
 
         ushort[] readValues = [1, 2, 3, 4, 5, 6];
         CollectionAssert.AreEqual(readValues, ReadWriteMultipleCodec.DecodeResponse(ReadWriteMultipleCodec.EncodeResponse(readValues)));
+    }
+
+    [TestMethod]
+    public void ReadWriteMultipleWriteOver121Rejected()
+    {
+        // 11 + 2N ADU cap: N=121 is the last legal write count.
+        ushort[] max = new ushort[121];
+        Assert.HasCount(9 + (121 * 2), ReadWriteMultipleCodec.EncodeRequest(0, 1, 0, max));
+
+        ushort[] over = new ushort[122];
+        Assert.ThrowsExactly<ArgumentOutOfRangeException>(
+            () => ReadWriteMultipleCodec.EncodeRequest(0, 1, 0, over));
+    }
+
+    [TestMethod]
+    public void SlaveDropsReadWriteMultipleOver121Frame()
+    {
+        ModbusRtuSlave slave = new(new FakeSerialTransport());
+        slave.Engine.AddSlave(1);
+
+        // 122 write registers need a 257-byte ADU: dropped at the frame cap.
+        byte[] body = new byte[9 + (122 * 2)];
+        body[8] = (byte)(122 * 2);
+        Assert.IsNull(slave.HandleRequest(new ModbusFrame(1, 0x17, body).Encode()));
+        Assert.AreEqual(1L, slave.Engine.BusCrcErrorCount);
+    }
+
+    [TestMethod]
+    public void SlaveRejectsReadWriteMultipleByteCountMismatch()
+    {
+        ModbusRtuSlave slave = new(new FakeSerialTransport());
+        slave.Engine.AddSlave(1);
+
+        byte[] body = ReadWriteMultipleCodec.EncodeRequest(0, 1, 0, [1, 2]);
+        body[8] = 0xFF;
+        byte[]? response = slave.HandleRequest(new ModbusFrame(1, 0x17, body).Encode());
+        Assert.AreEqual(ModbusExceptionCode.IllegalDataValue, DecodeException(response, 0x17));
+    }
+
+    [TestMethod]
+    public void FileReadResponseOverPduCapRejected()
+    {
+        // Two full-length records exceed the 253-byte PDU cap.
+        ushort[][] records = [new ushort[125], new ushort[125]];
+        Assert.ThrowsExactly<ArgumentOutOfRangeException>(
+            () => FileRecordCodec.EncodeReadResponse(records));
+    }
+
+    [TestMethod]
+    public void SlaveReportsFailureOnOversizeFileRead()
+    {
+        ModbusRtuSlave slave = new(new FakeSerialTransport());
+        slave.Engine.AddSlave(1);
+        slave.Engine.TryGetStore(1, out ModbusDataStore? store);
+        Assert.IsNotNull(store);
+        store.EnsureFile(1, 250);
+
+        FileSubRequest[] subs = [new(1, 0, 125), new(1, 125, 125)];
+        byte[]? response = slave.HandleRequest(
+            new ModbusFrame(1, 0x14, FileRecordCodec.EncodeReadRequest(subs)).Encode());
+        Assert.AreEqual(ModbusExceptionCode.SlaveDeviceFailure, DecodeException(response, 0x14));
     }
 
     [TestMethod]

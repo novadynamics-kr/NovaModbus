@@ -48,9 +48,9 @@ public static class FileRecordCodec
         ArgumentNullException.ThrowIfNull(records);
         ValidateSubCount(records.Count);
         int total = records.Sum(r => 1 + (r.Length * 2));
-        if (total > byte.MaxValue)
+        if (total > ModbusLimits.MaxPduSize - 1)
         {
-            throw new ArgumentOutOfRangeException(nameof(records), "Response too long.");
+            throw new ArgumentOutOfRangeException(nameof(records), "Response exceeds the PDU cap.");
         }
 
         byte[] body = new byte[1 + total];
@@ -121,9 +121,9 @@ public static class FileRecordCodec
             total += SubRequestSize + 1 + (datas[i].Length * 2);
         }
 
-        if (total > byte.MaxValue)
+        if (total > ModbusLimits.MaxPduSize - 1)
         {
-            throw new ArgumentOutOfRangeException(nameof(subs), "Request too long.");
+            throw new ArgumentOutOfRangeException(nameof(subs), "Request exceeds the PDU cap.");
         }
 
         byte[] body = new byte[1 + total];

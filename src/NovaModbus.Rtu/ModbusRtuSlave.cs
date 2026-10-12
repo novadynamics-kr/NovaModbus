@@ -447,6 +447,12 @@ public sealed class ModbusRtuSlave : IAsyncDisposable
             }
         }
 
+        if (1 + records.Sum(r => 2 + (r.Length * 2)) > ModbusLimits.MaxPduSize)
+        {
+            // Valid request the device cannot answer within the PDU cap.
+            return ExceptionFrame(slaveId, function, ModbusExceptionCode.SlaveDeviceFailure);
+        }
+
         return OkFrame(slaveId, function, FileRecordCodec.EncodeReadResponse(records));
     }
 

@@ -13,7 +13,7 @@ public sealed class SlaveSerialSettingsViewModel : ViewModelBase
     private string? _selectedPort;
     private string _baudRateText = "9600";
     private int _dataBits = 8;
-    private string _parity = "None";
+    private string _parity = "Even";
     private string _stopBits = "One";
     private string _statusMessage = string.Empty;
 
@@ -30,14 +30,14 @@ public sealed class SlaveSerialSettingsViewModel : ViewModelBase
     /// <summary>Common baud rates (editable for custom values).</summary>
     public ObservableCollection<string> AvailableBaudRates { get; } = new(DefaultBaudRates);
 
-    /// <summary>Available data-bit options.</summary>
-    public ObservableCollection<int> AvailableDataBits { get; } = [5, 6, 7, 8];
+    /// <summary>Available data-bit options (RTU requires 8).</summary>
+    public ObservableCollection<int> AvailableDataBits { get; } = [8];
 
     /// <summary>Available parity options.</summary>
     public ObservableCollection<string> AvailableParity { get; } = ["None", "Odd", "Even", "Mark", "Space"];
 
-    /// <summary>Available stop-bit options.</summary>
-    public ObservableCollection<string> AvailableStopBits { get; } = ["One", "OnePointFive", "Two"];
+    /// <summary>Available stop-bit options (RTU 11-bit characters).</summary>
+    public ObservableCollection<string> AvailableStopBits { get; } = ["One", "Two"];
 
     /// <summary>Selected COM port.</summary>
     public string? SelectedPort
@@ -127,6 +127,8 @@ public sealed class SlaveSerialSettingsViewModel : ViewModelBase
             throw new InvalidOperationException($"Invalid baud rate: '{BaudRateText}'.");
         }
 
-        return new SerialSettings(SelectedPort, BaudRate, DataBits, Parity, StopBits);
+        SerialSettings settings = new(SelectedPort, BaudRate, DataBits, Parity, StopBits);
+        settings.Validate();
+        return settings;
     }
 }
