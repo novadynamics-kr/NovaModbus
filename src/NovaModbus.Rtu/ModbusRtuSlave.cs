@@ -58,6 +58,12 @@ public sealed class ModbusRtuSlave : IAsyncDisposable
         }
 
         Engine.NoteBusMessage();
+        if (frame.SlaveId == ModbusLimits.BroadcastAddress)
+        {
+            HandleBroadcast(frame.Function, frame.Data);
+            return null;
+        }
+
         if (!Engine.TryGetStore(frame.SlaveId, out ModbusDataStore? store) || store is null)
         {
             return null;
@@ -109,8 +115,40 @@ public sealed class ModbusRtuSlave : IAsyncDisposable
         return true;
     }
 
-    private static byte[]? Dispatch(byte slaveId, byte functionByte, byte[] data, ModbusDataStore store, ModbusSlaveEngine engine)
+    /// <summary>
+    /// Execute a broadcast request on every store. Only writing functions are applied;
+    /// reads, diagnostics and unknown functions are ignored. Never responds
+    /// (not even exceptions or busy), per spec.
+    /// </summary>
+    private void HandleBroadcast(byte functionByte, byte[] data)
     {
+        ModbusFunction function = (ModbusFunction)functionByte;
+        bool writable = function is ModbusFunction.WriteSingleCoil
+            or ModbusFunction.WriteSingleRegister
+            or ModbusFunction.WriteMultipleCoils
+            or ModbusFunction.WriteMultipleRegisters
+            or ModbusFunction.WriteFileRecord
+            or ModbusFunction.MaskWriteRegister
+            or ModbusFunction.ReadWriteMultipleRegisters;
+        if (!writable)
+        {
+            return;
+        }
+
+        foreach (byte id in Engine.SlaveIds)
+        {
+            if (!Engine.TryGetStore(id, out ModbusDataStore? store) || store is null)
+            {
+                continue;
+            }
+
+            store.NoteSlaveMessage();
+            store.NoteEvent(0x00);
+            _ = Dispatch(id, functionByte, data, store, Engine);
+        }
+    }
+
+    private static byte[]? Dispatch(byte slaveId, byte functionByte, byte[] data, ModbusDataStore store, ModbusSlaveEngine engine)    {
         ModbusFunction function = (ModbusFunction)functionByte;
         return function switch
         {

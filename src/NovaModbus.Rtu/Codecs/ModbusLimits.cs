@@ -38,4 +38,7 @@ public static class ModbusLimits
 
     /// <summary>Max bulk-add item count (UI range operations).</summary>
     public const int MaxBulkAdd = 65535;
+
+    /// <summary>Broadcast slave address (0): all slaves act, none respond.</summary>
+    public const byte BroadcastAddress = 0;
 }

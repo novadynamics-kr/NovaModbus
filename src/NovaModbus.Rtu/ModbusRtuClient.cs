@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using NovaModbus.Rtu.Codecs;
 using NovaModbus.Rtu.Enums;
 using NovaModbus.Rtu.Logging;
@@ -5,11 +6,12 @@ using NovaModbus.Rtu.Transport;
 
 namespace NovaModbus.Rtu;
 
-/// <summary>Modbus RTU master for FC 01,02,03,04,05,06,15,16.</summary>
+/// <summary>Modbus RTU master: full serial-line function set + broadcast writes.</summary>
 public sealed class ModbusRtuClient : IAsyncDisposable
 {
     private readonly ISerialTransport _transport;
     private readonly IModbusLogger _logger;
+    private long _lastBroadcastTicks;
 
     /// <summary>Initializes a client over the given transport.</summary>
     public ModbusRtuClient(ISerialTransport transport, int baudRate = 9600, IModbusLogger? logger = null)
@@ -224,10 +226,97 @@ public sealed class ModbusRtuClient : IAsyncDisposable
         return FifoQueueCodec.DecodeResponse(body);
     }
 
-    private Task<byte[]> ExchangeAsync(byte slaveId, ModbusFunction function, byte[] requestBody, CancellationToken cancellationToken) =>
-        ModbusTransaction.ExchangeAsync(
+    /// <summary>Broadcast single-coil write (FC05). No response is returned.</summary>
+    public Task BroadcastWriteSingleCoilAsync(ushort address, bool on, CancellationToken cancellationToken = default) =>
+        BroadcastAsync(ModbusFunction.WriteSingleCoil, WriteSingleCoilCodec.Encode(address, on), cancellationToken);
+
+    /// <summary>Broadcast single-register write (FC06). No response is returned.</summary>
+    public Task BroadcastWriteSingleRegisterAsync(ushort address, ushort value, CancellationToken cancellationToken = default) =>
+        BroadcastAsync(ModbusFunction.WriteSingleRegister, WriteSingleRegisterCodec.Encode(address, value), cancellationToken);
+
+    /// <summary>Broadcast multiple-coil write (FC0F). No response is returned.</summary>
+    public Task BroadcastWriteMultipleCoilsAsync(ushort start, bool[] values, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(values);
+        return BroadcastAsync(ModbusFunction.WriteMultipleCoils, WriteMultipleCoilsCodec.EncodeRequest(start, values), cancellationToken);
+    }
+
+    /// <summary>Broadcast multiple-register write (FC10). No response is returned.</summary>
+    public Task BroadcastWriteMultipleRegistersAsync(ushort start, ushort[] values, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(values);
+        return BroadcastAsync(ModbusFunction.WriteMultipleRegisters, WriteMultipleRegistersCodec.EncodeRequest(start, values), cancellationToken);
+    }
+
+    /// <summary>Broadcast file-record write (FC15). No response is returned.</summary>
+    public Task BroadcastWriteFileRecordAsync(FileSubRequest[] subs, ushort[][] datas, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(subs);
+        ArgumentNullException.ThrowIfNull(datas);
+        return BroadcastAsync(ModbusFunction.WriteFileRecord, FileRecordCodec.EncodeWriteRequest(subs, datas), cancellationToken);
+    }
+
+    /// <summary>Broadcast mask-write register (FC16). No response is returned.</summary>
+    public Task BroadcastMaskWriteRegisterAsync(ushort address, ushort andMask, ushort orMask, CancellationToken cancellationToken = default) =>
+        BroadcastAsync(ModbusFunction.MaskWriteRegister, MaskWriteCodec.Encode(address, andMask, orMask), cancellationToken);
+
+    /// <summary>
+    /// Broadcast a writing function to address 0. All slaves act, none respond:
+    /// returns after transmitting (fire-and-forget). Enforces the t3.5 line quiet
+    /// before this and the next transmission.
+    /// </summary>
+    public async Task BroadcastAsync(ModbusFunction function, byte[] requestBody, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(requestBody);
+        bool writable = function is ModbusFunction.WriteSingleCoil
+            or ModbusFunction.WriteSingleRegister
+            or ModbusFunction.WriteMultipleCoils
+            or ModbusFunction.WriteMultipleRegisters
+            or ModbusFunction.WriteFileRecord
+            or ModbusFunction.MaskWriteRegister
+            or ModbusFunction.ReadWriteMultipleRegisters;
+        if (!writable)
+        {
+            throw new ArgumentException(
+                "Broadcast supports writing functions only (05/06/0F/10/15/16/17).", nameof(function));
+        }
+
+        byte[] request = new ModbusFrame(ModbusLimits.BroadcastAddress, (byte)function, requestBody).Encode();
+        if (request.Length > RtuFramer.MaxFrameSize)
+        {
+            throw new ArgumentException("Broadcast frame exceeds 256 bytes.", nameof(requestBody));
+        }
+
+        await ApplyLineQuietAsync(cancellationToken).ConfigureAwait(false);
+        await _transport.WriteAsync(request, cancellationToken).ConfigureAwait(false);
+        _logger.LogTx(request);
+        Interlocked.Exchange(ref _lastBroadcastTicks, Stopwatch.GetTimestamp());
+    }
+
+    private async Task<byte[]> ExchangeAsync(byte slaveId, ModbusFunction function, byte[] requestBody, CancellationToken cancellationToken)
+    {
+        await ApplyLineQuietAsync(cancellationToken).ConfigureAwait(false);
+        return await ModbusTransaction.ExchangeAsync(
             _transport, BaudRate, slaveId, (byte)function, requestBody,
-            Timeout, Retries, logger: _logger, cancellationToken: cancellationToken);
+            Timeout, Retries, logger: _logger, cancellationToken: cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>Wait out the t3.5 line quiet after a broadcast send (no-op otherwise).</summary>
+    private async Task ApplyLineQuietAsync(CancellationToken cancellationToken)
+    {
+        long last = Interlocked.Read(ref _lastBroadcastTicks);
+        if (last == 0)
+        {
+            return;
+        }
+
+        TimeSpan quiet = RtuFramer.SilentInterval(BaudRate);
+        TimeSpan elapsed = Stopwatch.GetElapsedTime(last, Stopwatch.GetTimestamp());
+        if (elapsed < quiet)
+        {
+            await Task.Delay(quiet - elapsed, cancellationToken).ConfigureAwait(false);
+        }
+    }
 
     /// <inheritdoc />
     public ValueTask DisposeAsync() => _transport.DisposeAsync();
