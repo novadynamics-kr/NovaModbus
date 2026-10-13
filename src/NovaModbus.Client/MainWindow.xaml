@@ -126,7 +126,7 @@
                 <ListView Margin="8" FontFamily="Consolas" ItemsSource="{Binding Lines}"/>
             </TabViewItem>
             <TabViewItem IsClosable="False" Header="Watch" DataContext="{Binding Watch}">
-                <Grid Margin="8" RowSpacing="8" Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
+                <Grid x:Name="WatchGrid" Margin="8" RowSpacing="8" Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
@@ -229,6 +229,7 @@
                                 <TextBlock Grid.Column="5" Text="Extra" Foreground="Gray"/>
                             </Grid>
                             <ListView x:Name="EntriesList" Grid.Row="2" SelectionMode="Multiple" Background="{ThemeResource LayerFillColorDefaultBrush}" ItemsSource="{Binding Entries}"
+                                      ScrollViewer.VerticalScrollMode="Disabled"
                                       HorizontalContentAlignment="Stretch"
                                       ScrollViewer.HorizontalScrollMode="Disabled"
                                       ScrollViewer.HorizontalScrollBarVisibility="Disabled">
@@ -290,6 +291,7 @@
                                 <TextBlock Grid.Column="6" Text="Status" Foreground="Gray"/>
                             </Grid>
                             <ListView x:Name="ResultsList" Grid.Row="2" SelectionMode="Multiple" Background="{ThemeResource LayerFillColorDefaultBrush}" ItemsSource="{Binding Results}"
+                                      ScrollViewer.VerticalScrollMode="Disabled"
                                       HorizontalContentAlignment="Stretch"
                                       ScrollViewer.HorizontalScrollMode="Disabled"
                                       ScrollViewer.HorizontalScrollBarVisibility="Disabled">

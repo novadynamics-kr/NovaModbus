@@ -21,8 +21,7 @@ public sealed partial class MainWindow : Window
         InitializeComponent();
         Root.DataContext = new MainViewModel();
         Closed += OnClosed;
-        EntriesList.PointerWheelChanged += OnWatchWheel;
-        ResultsList.PointerWheelChanged += OnWatchWheel;
+        WatchGrid.PointerWheelChanged += OnWatchGridWheel;
         EntriesList.SelectionChanged += OnWatchSelectionChanged;
         ResultsList.SelectionChanged += OnWatchSelectionChanged;
         if (ViewModel is MainViewModel vm)
@@ -153,22 +152,44 @@ public sealed partial class MainWindow : Window
 
     private MainViewModel? ViewModel => Root.DataContext as MainViewModel;
 
-    /// <summary>Route wheel input to the hovered list's own scroller (deterministic).</summary>
-    /// <remarks>Connected directly on each list element. Skips if native scrolling
-    /// already consumed the event, otherwise scrolls this list instantly
-    /// (no animation, so rapid notches never fight stale offsets).</remarks>
-    private void OnWatchWheel(object sender, PointerRoutedEventArgs e)
+    /// <summary>Scroll the list under the pointer (region recognition).</summary>
+    /// <remarks>Ignores the bubble path: the native route misdelivers between the two
+    /// lists, so the pointer position decides. Native wheel scrolling of both lists
+    /// is disabled (<c>VerticalScrollMode="Disabled"</c>); all wheel scrolling flows
+    /// through here. Bounds are read live from layout — no fixed coordinates,
+    /// any window size.</remarks>
+    private void OnWatchGridWheel(object sender, PointerRoutedEventArgs e)
     {
-        if (e.Handled
-            || sender is not ListView list
-            || FindScrollViewer(list) is not ScrollViewer viewer)
+        Windows.Foundation.Point position = e.GetCurrentPoint(WatchGrid).Position;
+        ListView? target = HitList(position);
+        if (target is null
+            || e.GetCurrentPoint(target).Properties.IsHorizontalMouseWheel
+            || FindScrollViewer(target) is not ScrollViewer viewer)
         {
             return;
         }
 
-        int delta = e.GetCurrentPoint(list).Properties.MouseWheelDelta;
+        int delta = e.GetCurrentPoint(target).Properties.MouseWheelDelta;
         viewer.ChangeView(null, viewer.VerticalOffset - delta, null, true);
         e.Handled = true;
+    }
+
+    private ListView? HitList(Windows.Foundation.Point position)
+    {
+        if (IsInside(position, EntriesList))
+        {
+            return EntriesList;
+        }
+
+        return IsInside(position, ResultsList) ? ResultsList : null;
+    }
+
+    private bool IsInside(Windows.Foundation.Point position, ListView list)
+    {
+        Windows.Foundation.Point origin =
+            list.TransformToVisual(WatchGrid).TransformPoint(new Windows.Foundation.Point(0, 0));
+        return position.X >= origin.X && position.X < origin.X + list.ActualWidth
+            && position.Y >= origin.Y && position.Y < origin.Y + list.ActualHeight;
     }
 
     private static ScrollViewer? FindScrollViewer(DependencyObject root)
