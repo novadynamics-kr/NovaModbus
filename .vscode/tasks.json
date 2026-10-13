@@ -1,0 +1,16 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "coverage: test + html report",
+      "type": "shell",
+      "command": "powershell -NoProfile -ExecutionPolicy Bypass -File ${workspaceFolder}/coverage.ps1",
+      "group": "test",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "problemMatcher": "$msCompile"
+    }
+  ]
+}
