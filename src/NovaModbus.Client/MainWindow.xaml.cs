@@ -21,8 +21,8 @@ public sealed partial class MainWindow : Window
         InitializeComponent();
         Root.DataContext = new MainViewModel();
         Closed += OnClosed;
-        EntriesList.PointerWheelChanged += OnWatchWheel;
-        ResultsList.PointerWheelChanged += OnWatchWheel;
+        EntriesList.AddHandler(ListView.PointerWheelChangedEvent, new PointerEventHandler(OnWatchWheel), true);
+        ResultsList.AddHandler(ListView.PointerWheelChangedEvent, new PointerEventHandler(OnWatchWheel), true);
         EntriesList.SelectionChanged += OnWatchSelectionChanged;
         ResultsList.SelectionChanged += OnWatchSelectionChanged;
         if (ViewModel is MainViewModel vm)
@@ -154,15 +154,20 @@ public sealed partial class MainWindow : Window
     private MainViewModel? ViewModel => Root.DataContext as MainViewModel;
 
     /// <summary>Route wheel input to the hovered list's own scroller (deterministic).</summary>
+    /// <remarks>Runs even when already handled: skips if native scrolling already
+    /// consumed the event, otherwise scrolls this list instantly (no animation,
+    /// so rapid notches never fight stale offsets) at any window size.</remarks>
     private void OnWatchWheel(object sender, PointerRoutedEventArgs e)
     {
-        if (sender is not ListView list || FindScrollViewer(list) is not ScrollViewer viewer)
+        if (e.Handled
+            || sender is not ListView list
+            || FindScrollViewer(list) is not ScrollViewer viewer)
         {
             return;
         }
 
         int delta = e.GetCurrentPoint(list).Properties.MouseWheelDelta;
-        viewer.ChangeView(null, viewer.VerticalOffset - delta, null);
+        viewer.ChangeView(null, viewer.VerticalOffset - delta, null, true);
         e.Handled = true;
     }
 
