@@ -18,6 +18,7 @@ Windows .NET 10 기반 Modbus RTU 솔루션용 에이전트 규칙.
 - `src/NovaModbus.Client/` — Modbus Client, WPF, `net10.0-windows`
 - `src/NovaModbus.Slave/` — Modbus Slave 시뮬레이터 (멀티 ID), WPF, `net10.0-windows`
 - `tests/NovaModbus.Rtu.Tests/` — MSTest, `net10.0`
+- `tests/NovaModbus.Client.Tests/` + `tests/NovaModbus.Slave.Tests/` — MSTest, `net10.0-windows` (순수 로직만, Dispatcher/UI 제외)
 - 언어: 코드·주석 영어, 문서 한국어 가능
 
 ## 2. Hard Constraints (사용자 확정)
