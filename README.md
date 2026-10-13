@@ -55,10 +55,11 @@ powershell -NoProfile -ExecutionPolicy Bypass -File coverage.ps1
 ```
 
 또는 VS Code 명령 팔레트 → "Tasks: Run Task" → "coverage: test + html report".
-흐름: MSTest 수집 (`Microsoft.CodeCoverage`, `CodeCoverage.runsettings`가
-`*Tests.dll` 제외 → 제품 어셈블리만 측정) → Cobertura 변환
-(`dotnet-coverage`) → HTML 생성 (`reportgenerator`).
-`coverage-report/index.html`을 열어 확인한다.
+흐름: MSTest 이중 수집 (`XPlat Code Coverage` coverlet → 라인+브랜치 Cobertura,
+`Code Coverage` Microsoft → VS용 `.coverage`) → HTML 생성 (`reportgenerator`).
+`CodeCoverage.runsettings`가 `*Tests.dll`을 측정에서 제외하므로
+결과에는 제품 어셈블리(`NovaModbus.Rtu.dll`)만 포함된다.
+`coverage-report/index.html`을 열어 확인한다 (라인·브랜치·클래스별 상세).
 필요 도구는 `dotnet-tools.json`에 버전 고정되어 스크립트가 자동 복원한다.
 수집물(`TestResults/`, `coverage-report/`)은 커밋하지 않는다.
 
