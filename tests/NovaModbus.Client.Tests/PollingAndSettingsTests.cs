@@ -32,4 +32,15 @@ public sealed class PollingAndSettingsTests
         Assert.IsTrue(vm.IsVirtualSelected);
         Assert.AreEqual("demo", vm.VirtualEndpointName);
     }
+
+    [TestMethod]
+    public void BaudRatePresetMirrorsKnownRates()
+    {
+        var vm = new SerialPortSettingsViewModel();
+        Assert.AreEqual("9600", vm.BaudRatePreset);
+        vm.BaudRateText = "115200";
+        Assert.AreEqual("115200", vm.BaudRatePreset);
+        vm.BaudRateText = "12345";
+        Assert.IsNull(vm.BaudRatePreset);
+    }
 }

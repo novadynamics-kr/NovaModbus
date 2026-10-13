@@ -70,6 +70,20 @@ public sealed partial class SerialPortSettingsViewModel : ObservableObject
     /// <summary>Whether the baud rate text is a positive integer.</summary>
     public bool IsBaudRateValid => BaudRate > 0;
 
+    /// <summary>Preset selection mirror (WinUI editable ComboBox does not render
+    /// a bare Text binding initially; SelectedItem drives the display).</summary>
+    public string? BaudRatePreset
+    {
+        get => AvailableBaudRates.Contains(BaudRateText) ? BaudRateText : null;
+        set
+        {
+            if (value is not null)
+            {
+                BaudRateText = value;
+            }
+        }
+    }
+
     /// <summary>Reload the system port list.</summary>
     public IRelayCommand RefreshPortsCommand { get; }
 
@@ -126,5 +140,6 @@ public sealed partial class SerialPortSettingsViewModel : ObservableObject
     {
         OnPropertyChanged(nameof(BaudRate));
         OnPropertyChanged(nameof(IsBaudRateValid));
+        OnPropertyChanged(nameof(BaudRatePreset));
     }
 }

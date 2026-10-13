@@ -5,7 +5,7 @@
     Title="NovaModbus Client">
     <Grid x:Name="Root" ColumnSpacing="8">
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="270"/>
+            <ColumnDefinition Width="300"/>
             <ColumnDefinition Width="*"/>
         </Grid.ColumnDefinitions>
 
@@ -28,7 +28,8 @@
                 <TextBlock Text="Baud Rate"/>
                 <ComboBox IsEditable="True" HorizontalAlignment="Stretch"
                           ItemsSource="{Binding AvailableBaudRates}"
-                          Text="{Binding BaudRateText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                          SelectedItem="{Binding BaudRatePreset, Mode=TwoWay}"
+                          Text="{Binding BaudRateText, Mode=TwoWay}"/>
 
                 <TextBlock Text="Data Bits"/>
                 <ComboBox HorizontalAlignment="Stretch"
@@ -59,7 +60,7 @@
         </StackPanel>
 
         <TabView Grid.Column="1" Margin="0,8,8,8" IsAddTabButtonVisible="False">
-            <TabViewItem Header="Read / Write" DataContext="{Binding ReadWrite}">
+            <TabViewItem IsClosable="False" Header="Read / Write" DataContext="{Binding ReadWrite}">
                 <Grid Margin="8" RowSpacing="8">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
@@ -102,7 +103,7 @@
                              Text="{Binding ResultText, Mode=OneWay}"/>
                 </Grid>
             </TabViewItem>
-            <TabViewItem Header="Polling" DataContext="{Binding Polling}">
+            <TabViewItem IsClosable="False" Header="Polling" DataContext="{Binding Polling}">
                 <Grid Margin="8" RowSpacing="8">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
@@ -121,16 +122,20 @@
                     <ListView Grid.Row="1" FontFamily="Consolas" ItemsSource="{Binding History}"/>
                 </Grid>
             </TabViewItem>
-            <TabViewItem Header="Log" DataContext="{Binding CommLog}">
+            <TabViewItem IsClosable="False" Header="Log" DataContext="{Binding CommLog}">
                 <ListView Margin="8" FontFamily="Consolas" ItemsSource="{Binding Lines}"/>
             </TabViewItem>
-            <TabViewItem Header="Watch" DataContext="{Binding Watch}">
+            <TabViewItem IsClosable="False" Header="Watch" DataContext="{Binding Watch}">
                 <Grid Margin="8" RowSpacing="8">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="*"/>
-                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="2*"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="3*"/>
                     </Grid.RowDefinitions>
 
                     <Grid.KeyboardAccelerators>
@@ -196,35 +201,102 @@
                         <TextBlock VerticalAlignment="Center" Text="{Binding StatusText}"/>
                     </StackPanel>
 
-                    <ListView x:Name="EntriesList" Grid.Row="2" SelectionMode="Multiple" ItemsSource="{Binding Entries}">
+                    <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="4">
+                        <TextBlock Text="Entries (" FontWeight="SemiBold"/>
+                        <TextBlock Text="{Binding Entries.Count}" FontWeight="SemiBold"/>
+                        <TextBlock Text=")" FontWeight="SemiBold"/>
+                    </StackPanel>
+                    <Grid Grid.Row="3" Margin="40,0,0,0" ColumnSpacing="12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="44"/>
+                            <ColumnDefinition Width="130"/>
+                            <ColumnDefinition Width="64"/>
+                            <ColumnDefinition Width="76"/>
+                            <ColumnDefinition Width="64"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="Slave" Foreground="Gray"/>
+                        <TextBlock Grid.Column="1" Text="Area" Foreground="Gray"/>
+                        <TextBlock Grid.Column="2" Text="Addr" Foreground="Gray"/>
+                        <TextBlock Grid.Column="3" Text="Hex" Foreground="Gray"/>
+                        <TextBlock Grid.Column="4" Text="Count" Foreground="Gray"/>
+                        <TextBlock Grid.Column="5" Text="Extra" Foreground="Gray"/>
+                    </Grid>
+
+                    <ListView x:Name="EntriesList" Grid.Row="4" SelectionMode="Multiple" ItemsSource="{Binding Entries}"
+                              HorizontalContentAlignment="Stretch"
+                              ScrollViewer.HorizontalScrollMode="Disabled"
+                              ScrollViewer.HorizontalScrollBarVisibility="Disabled">
                         <ListView.ItemTemplate>
                             <DataTemplate>
-                                <StackPanel Orientation="Horizontal" Spacing="12">
-                                    <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay}" VerticalAlignment="Center"/>
-                                    <TextBlock Text="{Binding SlaveId}" Width="40" VerticalAlignment="Center"/>
-                                    <TextBlock Text="{Binding Area}" Width="130" VerticalAlignment="Center"/>
-                                    <TextBlock Text="{Binding Start}" Width="60" VerticalAlignment="Center"/>
-                                    <TextBlock Text="{Binding AddressHex}" Width="70" VerticalAlignment="Center"/>
-                                    <TextBlock Text="{Binding Count}" Width="60" VerticalAlignment="Center"/>
-                                    <TextBlock Text="{Binding Extra}" VerticalAlignment="Center"/>
-                                </StackPanel>
+                                <Grid ColumnSpacing="12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="44"/>
+                                        <ColumnDefinition Width="130"/>
+                                        <ColumnDefinition Width="64"/>
+                                        <ColumnDefinition Width="76"/>
+                                        <ColumnDefinition Width="64"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="{Binding SlaveId}" VerticalAlignment="Center"/>
+                                    <TextBlock Grid.Column="1" Text="{Binding Area}" VerticalAlignment="Center"/>
+                                    <TextBlock Grid.Column="2" Text="{Binding Start}" VerticalAlignment="Center"/>
+                                    <TextBlock Grid.Column="3" Text="{Binding AddressHex}" VerticalAlignment="Center"/>
+                                    <TextBlock Grid.Column="4" Text="{Binding Count}" VerticalAlignment="Center"/>
+                                    <TextBlock Grid.Column="5" Text="{Binding Extra}" VerticalAlignment="Center"/>
+                                </Grid>
                             </DataTemplate>
                         </ListView.ItemTemplate>
                     </ListView>
 
-                    <ListView x:Name="ResultsList" Grid.Row="3" SelectionMode="Multiple" ItemsSource="{Binding Results}">
+                    <StackPanel Grid.Row="5" Orientation="Horizontal" Spacing="4">
+                        <TextBlock Text="Results (" FontWeight="SemiBold"/>
+                        <TextBlock Text="{Binding Results.Count}" FontWeight="SemiBold"/>
+                        <TextBlock Text=")" FontWeight="SemiBold"/>
+                    </StackPanel>
+                    <Grid Grid.Row="6" Margin="40,0,0,0" ColumnSpacing="12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="44"/>
+                            <ColumnDefinition Width="130"/>
+                            <ColumnDefinition Width="64"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="96"/>
+                            <ColumnDefinition Width="140"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="Slave" Foreground="Gray"/>
+                        <TextBlock Grid.Column="1" Text="Area" Foreground="Gray"/>
+                        <TextBlock Grid.Column="2" Text="Addr" Foreground="Gray"/>
+                        <TextBlock Grid.Column="3" Text="Dec" Foreground="Gray"/>
+                        <TextBlock Grid.Column="4" Text="Hex" Foreground="Gray"/>
+                        <TextBlock Grid.Column="5" Text="Time" Foreground="Gray"/>
+                        <TextBlock Grid.Column="6" Text="Status" Foreground="Gray"/>
+                    </Grid>
+
+                    <ListView x:Name="ResultsList" Grid.Row="7" SelectionMode="Multiple" ItemsSource="{Binding Results}"
+                              HorizontalContentAlignment="Stretch"
+                              ScrollViewer.HorizontalScrollMode="Disabled"
+                              ScrollViewer.HorizontalScrollBarVisibility="Disabled">
                         <ListView.ItemTemplate>
                             <DataTemplate>
-                                <StackPanel Orientation="Horizontal" Spacing="12">
-                                    <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay}" VerticalAlignment="Center"/>
-                                    <TextBlock Text="{Binding Entry.SlaveId}" Width="40" VerticalAlignment="Center"/>
-                                    <TextBlock Text="{Binding Entry.Area}" Width="130" VerticalAlignment="Center"/>
-                                    <TextBlock Text="{Binding Entry.Start}" Width="60" VerticalAlignment="Center"/>
-                                    <TextBlock Text="{Binding ValueDecText}" FontFamily="Consolas" TextWrapping="Wrap" Width="300" VerticalAlignment="Center"/>
-                                    <TextBlock Text="{Binding ValueHexText}" FontFamily="Consolas" TextWrapping="Wrap" VerticalAlignment="Center"/>
-                                    <TextBlock Text="{Binding Timestamp}" Width="90" VerticalAlignment="Center"/>
-                                    <TextBlock Text="{Binding Status}" VerticalAlignment="Center"/>
-                                </StackPanel>
+                                <Grid ColumnSpacing="12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="44"/>
+                                        <ColumnDefinition Width="130"/>
+                                        <ColumnDefinition Width="64"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="96"/>
+                                        <ColumnDefinition Width="140"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="{Binding Entry.SlaveId}" VerticalAlignment="Center"/>
+                                    <TextBlock Grid.Column="1" Text="{Binding Entry.Area}" VerticalAlignment="Center"/>
+                                    <TextBlock Grid.Column="2" Text="{Binding Entry.Start}" VerticalAlignment="Center"/>
+                                    <TextBlock Grid.Column="3" Text="{Binding ValueDecText}" FontFamily="Consolas" TextWrapping="Wrap" VerticalAlignment="Center"/>
+                                    <TextBlock Grid.Column="4" Text="{Binding ValueHexText}" FontFamily="Consolas" TextWrapping="Wrap" VerticalAlignment="Center"/>
+                                    <TextBlock Grid.Column="5" Text="{Binding Timestamp}" VerticalAlignment="Center"/>
+                                    <TextBlock Grid.Column="6" Text="{Binding Status}" VerticalAlignment="Center"/>
+                                </Grid>
                             </DataTemplate>
                         </ListView.ItemTemplate>
                     </ListView>
