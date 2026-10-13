@@ -12,3 +12,7 @@
 /tests/NovaModbus.Rtu.Tests/bin
 /tests/NovaModbus.Rtu.Tests/obj
 **/TestResults
+coverage-report/
+coverage.xml
+
+.fake
