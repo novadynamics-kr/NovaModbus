@@ -12,6 +12,7 @@ dotnet test NovaModbus.slnx -c Release --settings CodeCoverage.runsettings --col
 $reports = @(
     'tests/NovaModbus.Rtu.Tests',
     'tests/NovaModbus.Client.Wpf.Tests',
+    'tests/NovaModbus.Client.Tests',
     'tests/NovaModbus.Slave.Tests'
 ) | ForEach-Object {
     Get-ChildItem "$_/TestResults" -Recurse -Filter coverage.cobertura.xml -ErrorAction SilentlyContinue |
