@@ -3,8 +3,114 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     Title="NovaModbus Client">
-    <StackPanel Padding="24" Spacing="8">
-        <TextBlock Text="NovaModbus Client (WinUI 3)" FontSize="20" />
-        <TextBlock x:Name="StatusText" Text="Scaffold — tabs arrive in later stages." />
-    </StackPanel>
+    <Grid x:Name="Root" ColumnSpacing="8">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="270"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+
+        <StackPanel Grid.Column="0" Margin="8" Spacing="8">
+            <StackPanel DataContext="{Binding SerialSettings}" Spacing="4">
+                <TextBlock Text="Serial Port" FontWeight="SemiBold"/>
+                <TextBlock Text="COM Port"/>
+                <Grid ColumnSpacing="4">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <ComboBox Grid.Column="0" HorizontalAlignment="Stretch"
+                              ItemsSource="{Binding AvailablePorts}"
+                              SelectedItem="{Binding SelectedPort, Mode=TwoWay}"/>
+                    <Button Grid.Column="1" Content="Refresh"
+                            Command="{Binding RefreshPortsCommand}"/>
+                </Grid>
+
+                <TextBlock Text="Baud Rate"/>
+                <ComboBox IsEditable="True" HorizontalAlignment="Stretch"
+                          ItemsSource="{Binding AvailableBaudRates}"
+                          Text="{Binding BaudRateText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+
+                <TextBlock Text="Data Bits"/>
+                <ComboBox HorizontalAlignment="Stretch"
+                          ItemsSource="{Binding AvailableDataBits}"
+                          SelectedItem="{Binding DataBits, Mode=TwoWay}"/>
+
+                <TextBlock Text="Parity"/>
+                <ComboBox HorizontalAlignment="Stretch"
+                          ItemsSource="{Binding AvailableParity}"
+                          SelectedItem="{Binding Parity, Mode=TwoWay}"/>
+
+                <TextBlock Text="Stop Bits"/>
+                <ComboBox HorizontalAlignment="Stretch"
+                          ItemsSource="{Binding AvailableStopBits}"
+                          SelectedItem="{Binding StopBits, Mode=TwoWay}"/>
+
+                <TextBlock Foreground="Gray" TextWrapping="Wrap"
+                           Text="{Binding StatusMessage}"/>
+            </StackPanel>
+
+            <CheckBox Content="Built-in test slave"
+                      IsChecked="{Binding TestSlaveEnabled, Mode=TwoWay}"/>
+            <Button Content="Connect" HorizontalAlignment="Stretch"
+                    Command="{Binding ConnectCommand}"/>
+            <Button Content="Disconnect" HorizontalAlignment="Stretch"
+                    Command="{Binding DisconnectCommand}"/>
+            <TextBlock TextWrapping="Wrap" Text="{Binding StatusText}"/>
+        </StackPanel>
+
+        <TabView Grid.Column="1" Margin="0,8,8,8" IsAddTabButtonVisible="False">
+            <TabViewItem Header="Read / Write" DataContext="{Binding ReadWrite}">
+                <Grid Margin="8" RowSpacing="8">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="8">
+                        <StackPanel>
+                            <TextBlock Text="Function"/>
+                            <ComboBox Width="180"
+                                      ItemsSource="{Binding AvailableFunctions}"
+                                      SelectedItem="{Binding SelectedFunction, Mode=TwoWay}"/>
+                        </StackPanel>
+                        <StackPanel>
+                            <TextBlock Text="Slave ID"/>
+                            <TextBox Width="70" Text="{Binding SlaveIdText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                        </StackPanel>
+                        <StackPanel>
+                            <TextBlock Text="Start"/>
+                            <TextBox Width="80" Text="{Binding StartText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                        </StackPanel>
+                        <StackPanel>
+                            <TextBlock Text="Count"/>
+                            <TextBox Width="80" IsEnabled="{Binding NeedsCount}" Text="{Binding CountText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                        </StackPanel>
+                        <StackPanel VerticalAlignment="Bottom">
+                            <Button Content="Execute" Padding="16,2"
+                                    Command="{Binding ExecuteCommand}"/>
+                        </StackPanel>
+                    </StackPanel>
+
+                    <StackPanel Grid.Row="1">
+                        <TextBlock Text="{Binding HintText}"/>
+                        <TextBox IsEnabled="{Binding NeedsValues}" Text="{Binding ValuesText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                    </StackPanel>
+
+                    <TextBox Grid.Row="2" IsReadOnly="True" FontFamily="Consolas"
+                             AcceptsReturn="True" TextWrapping="Wrap"
+                             Text="{Binding ResultText, Mode=OneWay}"/>
+                </Grid>
+            </TabViewItem>
+            <TabViewItem Header="Polling">
+                <TextBlock Margin="8" Text="Polling tab arrives in a later stage."/>
+            </TabViewItem>
+            <TabViewItem Header="Log">
+                <TextBlock Margin="8" Text="Log tab arrives in a later stage."/>
+            </TabViewItem>
+            <TabViewItem Header="Watch">
+                <TextBlock Margin="8" Text="Watch tab arrives in a later stage."/>
+            </TabViewItem>
+        </TabView>
+    </Grid>
 </Window>
