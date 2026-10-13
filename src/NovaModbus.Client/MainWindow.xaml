@@ -125,7 +125,7 @@
             <TabViewItem IsClosable="False" Header="Log" DataContext="{Binding CommLog}">
                 <ListView Margin="8" FontFamily="Consolas" ItemsSource="{Binding Lines}"/>
             </TabViewItem>
-            <TabViewItem IsClosable="False" Header="Watch" DataContext="{Binding Watch}">
+            <TabViewItem IsClosable="False" Header="Watch" IsSelected="True" DataContext="{Binding Watch}">
                 <Grid Margin="8" RowSpacing="8">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
