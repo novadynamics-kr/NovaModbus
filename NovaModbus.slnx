@@ -1,6 +1,7 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/NovaModbus.Client.Wpf/NovaModbus.Client.Wpf.csproj" />
+    <Project Path="src/NovaModbus.Client/NovaModbus.Client.csproj" />
     <Project Path="src/NovaModbus.Rtu/NovaModbus.Rtu.csproj" />
     <Project Path="src/NovaModbus.Slave/NovaModbus.Slave.csproj" />
   </Folder>

@@ -3,6 +3,8 @@
 ################################################################################
 
 /.vs
+/src/NovaModbus.Client/bin
+/src/NovaModbus.Client/obj
 /src/NovaModbus.Client.Wpf/bin
 /src/NovaModbus.Client.Wpf/obj
 /src/NovaModbus.Rtu/bin
