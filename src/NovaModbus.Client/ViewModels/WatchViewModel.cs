@@ -185,7 +185,11 @@ public sealed partial class WatchViewModel : ObservableObject, IDisposable
         // the bulk set: rebind realized result rows with a single Reset.
         Results.Refresh();
         StatusText = select ? $"All {Entries.Count} entries selected." : "Selection cleared.";
+        SelectionBulkChanged?.Invoke(this, EventArgs.Empty);
     }
+
+    /// <summary>Raised after a bulk selection change (per-item notifications are suppressed).</summary>
+    public event EventHandler? SelectionBulkChanged;
 
     /// <summary>Select all entries (sets IsSelected = true).</summary>
     public void SelectAll() => SelectAllItems(true);

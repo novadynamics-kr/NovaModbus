@@ -196,7 +196,7 @@
                         <TextBlock VerticalAlignment="Center" Text="{Binding StatusText}"/>
                     </StackPanel>
 
-                    <ListView Grid.Row="2" SelectionMode="None" ItemsSource="{Binding Entries}">
+                    <ListView x:Name="EntriesList" Grid.Row="2" SelectionMode="Multiple" ItemsSource="{Binding Entries}">
                         <ListView.ItemTemplate>
                             <DataTemplate>
                                 <StackPanel Orientation="Horizontal" Spacing="12">
@@ -212,7 +212,7 @@
                         </ListView.ItemTemplate>
                     </ListView>
 
-                    <ListView Grid.Row="3" SelectionMode="None" ItemsSource="{Binding Results}">
+                    <ListView x:Name="ResultsList" Grid.Row="3" SelectionMode="Multiple" ItemsSource="{Binding Results}">
                         <ListView.ItemTemplate>
                             <DataTemplate>
                                 <StackPanel Orientation="Horizontal" Spacing="12">

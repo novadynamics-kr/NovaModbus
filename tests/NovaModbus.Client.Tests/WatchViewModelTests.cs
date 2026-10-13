@@ -121,4 +121,16 @@ public sealed class WatchViewModelTests
         Assert.AreEqual("Error", vm.Results[0].Status);
         Assert.IsFalse(vm.IsBusy);
     }
+
+    [TestMethod]
+    public void BulkSelectRaisesBulkEvent()
+    {
+        var vm = new WatchViewModel(() => null);
+        vm.AddCommand.Execute(null);
+        int raised = 0;
+        vm.SelectionBulkChanged += (_, _) => raised++;
+        vm.SelectAllCommand.Execute(null);
+        Assert.AreEqual(1, raised);
+        Assert.IsTrue(vm.Entries[0].IsSelected);
+    }
 }
