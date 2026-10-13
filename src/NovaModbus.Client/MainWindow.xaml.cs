@@ -65,15 +65,52 @@ public sealed partial class MainWindow : Window
 
     private void OnWatchItemSelection(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName != nameof(WatchEntry.IsSelected) || sender is not WatchEntry entry)
+        if (e.PropertyName != nameof(WatchEntry.IsSelected)
+            || sender is not WatchEntry entry
+            || ViewModel is not MainViewModel vm)
         {
             return;
         }
 
-        SyncListsFromVm();
+        // O(1) per item: full scans freeze the UI at 65k rows.
+        SyncOne(EntriesList, entry);
+        foreach (WatchResult result in vm.Watch.Results)
+        {
+            if (ReferenceEquals(result.Entry, entry))
+            {
+                SyncOne(ResultsList, result);
+                break;
+            }
+        }
     }
 
-    private void OnWatchBulkChanged(object? sender, EventArgs e) => SyncListsFromVm();
+    private void OnWatchBulkChanged(object? sender, EventArgs e)
+    {
+        // O(n): native batch selection instead of per-item scans (freezes at 65k rows).
+        if (ViewModel is not MainViewModel vm)
+        {
+            return;
+        }
+
+        _syncingSelection = true;
+        try
+        {
+            if (vm.Watch.Entries.Count > 0 && vm.Watch.Entries[0].IsSelected)
+            {
+                EntriesList.SelectAll();
+                ResultsList.SelectAll();
+            }
+            else
+            {
+                EntriesList.SelectedItems.Clear();
+                ResultsList.SelectedItems.Clear();
+            }
+        }
+        finally
+        {
+            _syncingSelection = false;
+        }
+    }
 
     private void OnWatchSelectionChanged(object sender, SelectionChangedEventArgs e)
     {
@@ -100,44 +137,21 @@ public sealed partial class MainWindow : Window
         }
     }
 
-    private void SyncListsFromVm()
-    {
-        if (_syncingSelection || ViewModel is not MainViewModel vm)
-        {
-            return;
-        }
-
-        _syncingSelection = true;
-        try
-        {
-            SyncList(EntriesList, vm.Watch.Entries);
-            SyncList(ResultsList, vm.Watch.Results);
-        }
-        finally
-        {
-            _syncingSelection = false;
-        }
-    }
-
-    private static void SyncList<T>(ListView list, IEnumerable<T> items)
+    private static void SyncOne<T>(ListView list, T item)
         where T : ISelectable
     {
-        foreach (T item in items)
+        bool listed = list.SelectedItems.Contains(item);
+        if (item.IsSelected && !listed)
         {
-            bool listed = list.SelectedItems.Contains(item);
-            if (item.IsSelected && !listed)
-            {
-                list.SelectedItems.Add(item);
-            }
-            else if (!item.IsSelected && listed)
-            {
-                list.SelectedItems.Remove(item);
-            }
+            list.SelectedItems.Add(item);
+        }
+        else if (!item.IsSelected && listed)
+        {
+            list.SelectedItems.Remove(item);
         }
     }
 
     private MainViewModel? ViewModel => Root.DataContext as MainViewModel;
-
 
     /// <summary>Route wheel input to the hovered list's own scroller (deterministic).</summary>
     private void OnWatchWheel(object sender, PointerRoutedEventArgs e)
