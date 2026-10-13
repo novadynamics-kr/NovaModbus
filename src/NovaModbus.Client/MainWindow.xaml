@@ -102,14 +102,133 @@
                              Text="{Binding ResultText, Mode=OneWay}"/>
                 </Grid>
             </TabViewItem>
-            <TabViewItem Header="Polling">
-                <TextBlock Margin="8" Text="Polling tab arrives in a later stage."/>
+            <TabViewItem Header="Polling" DataContext="{Binding Polling}">
+                <Grid Margin="8" RowSpacing="8">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="8">
+                        <StackPanel>
+                            <TextBlock Text="Interval (ms)"/>
+                            <TextBox Width="100" Text="{Binding IntervalMsText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Bottom" Spacing="4">
+                            <Button Content="Start" Padding="16,2" Command="{Binding StartCommand}"/>
+                            <Button Content="Stop" Padding="16,2" Command="{Binding StopCommand}"/>
+                        </StackPanel>
+                    </StackPanel>
+                    <ListView Grid.Row="1" FontFamily="Consolas" ItemsSource="{Binding History}"/>
+                </Grid>
             </TabViewItem>
-            <TabViewItem Header="Log">
-                <TextBlock Margin="8" Text="Log tab arrives in a later stage."/>
+            <TabViewItem Header="Log" DataContext="{Binding CommLog}">
+                <ListView Margin="8" FontFamily="Consolas" ItemsSource="{Binding Lines}"/>
             </TabViewItem>
-            <TabViewItem Header="Watch">
-                <TextBlock Margin="8" Text="Watch tab arrives in a later stage."/>
+            <TabViewItem Header="Watch" DataContext="{Binding Watch}">
+                <Grid Margin="8" RowSpacing="8">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <Grid.KeyboardAccelerators>
+                        <KeyboardAccelerator Key="A" Modifiers="Control" Invoked="OnWatchSelectAll"/>
+                        <KeyboardAccelerator Key="Delete" Invoked="OnWatchDeleteKey"/>
+                        <KeyboardAccelerator Key="Escape" Invoked="OnWatchDeselectAll"/>
+                    </Grid.KeyboardAccelerators>
+
+                    <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="8">
+                        <StackPanel>
+                            <TextBlock Text="Slave ID"/>
+                            <TextBox Width="70" Text="{Binding SlaveIdText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                        </StackPanel>
+                        <StackPanel>
+                            <TextBlock Text="Area"/>
+                            <ComboBox Width="140" ItemsSource="{Binding Areas}"
+                                      SelectedItem="{Binding Area, Mode=TwoWay}"/>
+                        </StackPanel>
+                        <StackPanel>
+                            <TextBlock Text="Address (dec/0x)"/>
+                            <TextBox Width="80" Text="{Binding StartText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                        </StackPanel>
+                        <StackPanel>
+                            <TextBlock Text="End (dec/0x)"/>
+                            <TextBox Width="80" Text="{Binding AddressEndText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                        </StackPanel>
+                        <StackPanel>
+                            <TextBlock Text="Count / Record"/>
+                            <TextBox Width="80" Text="{Binding CountText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                        </StackPanel>
+                        <StackPanel>
+                            <TextBlock Text="Extra (diag data / file len)"/>
+                            <TextBox Width="140" Text="{Binding ExtraText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Bottom" Spacing="4">
+                            <Button Content="Add" Padding="16,2" Command="{Binding AddCommand}"/>
+                            <Button Content="Add Range" Padding="16,2" Command="{Binding AddRangeCommand}"/>
+                            <Button Content="Del" Padding="16,2" Click="OnWatchDelete"/>
+                            <Button Content="Clear All" Padding="16,2"
+                                    Command="{Binding ClearAllCommand}"
+                                    ToolTipService.ToolTip="Remove all entries and results (single operation)"/>
+                            <Button Content="Select All" Padding="16,2"
+                                    Command="{Binding SelectAllCommand}"
+                                    ToolTipService.ToolTip="Select all entries (Ctrl+A)"/>
+                            <Button Content="Deselect All" Padding="16,2"
+                                    Command="{Binding DeselectAllCommand}"
+                                    ToolTipService.ToolTip="Clear selection"/>
+                            <Button Content="Save" Padding="16,2" Click="OnWatchSave"/>
+                            <Button Content="Load" Padding="16,2" Click="OnWatchLoad"/>
+                        </StackPanel>
+                    </StackPanel>
+
+                    <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="8">
+                        <Button Content="Read All" Padding="16,2" Command="{Binding ReadAllCommand}"/>
+                        <CheckBox Content="Auto-refresh" VerticalAlignment="Center"
+                                  IsChecked="{Binding AutoRefresh, Mode=TwoWay}"/>
+                        <TextBox Width="80" VerticalAlignment="Center"
+                                 Text="{Binding AutoIntervalMsText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                        <TextBlock Text="ms" VerticalAlignment="Center"/>
+                        <ProgressBar Width="120" VerticalAlignment="Center"
+                                     Minimum="0" Maximum="100"
+                                     Value="{Binding BulkProgress, Mode=OneWay}"/>
+                        <TextBlock VerticalAlignment="Center" Text="{Binding StatusText}"/>
+                    </StackPanel>
+
+                    <ListView Grid.Row="2" SelectionMode="None" ItemsSource="{Binding Entries}">
+                        <ListView.ItemTemplate>
+                            <DataTemplate>
+                                <StackPanel Orientation="Horizontal" Spacing="12">
+                                    <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay}" VerticalAlignment="Center"/>
+                                    <TextBlock Text="{Binding SlaveId}" Width="40" VerticalAlignment="Center"/>
+                                    <TextBlock Text="{Binding Area}" Width="130" VerticalAlignment="Center"/>
+                                    <TextBlock Text="{Binding Start}" Width="60" VerticalAlignment="Center"/>
+                                    <TextBlock Text="{Binding AddressHex}" Width="70" VerticalAlignment="Center"/>
+                                    <TextBlock Text="{Binding Count}" Width="60" VerticalAlignment="Center"/>
+                                    <TextBlock Text="{Binding Extra}" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </DataTemplate>
+                        </ListView.ItemTemplate>
+                    </ListView>
+
+                    <ListView Grid.Row="3" SelectionMode="None" ItemsSource="{Binding Results}">
+                        <ListView.ItemTemplate>
+                            <DataTemplate>
+                                <StackPanel Orientation="Horizontal" Spacing="12">
+                                    <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay}" VerticalAlignment="Center"/>
+                                    <TextBlock Text="{Binding Entry.SlaveId}" Width="40" VerticalAlignment="Center"/>
+                                    <TextBlock Text="{Binding Entry.Area}" Width="130" VerticalAlignment="Center"/>
+                                    <TextBlock Text="{Binding Entry.Start}" Width="60" VerticalAlignment="Center"/>
+                                    <TextBlock Text="{Binding ValueDecText}" FontFamily="Consolas" TextWrapping="Wrap" Width="300" VerticalAlignment="Center"/>
+                                    <TextBlock Text="{Binding ValueHexText}" FontFamily="Consolas" TextWrapping="Wrap" VerticalAlignment="Center"/>
+                                    <TextBlock Text="{Binding Timestamp}" Width="90" VerticalAlignment="Center"/>
+                                    <TextBlock Text="{Binding Status}" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </DataTemplate>
+                        </ListView.ItemTemplate>
+                    </ListView>
+                </Grid>
             </TabViewItem>
         </TabView>
     </Grid>

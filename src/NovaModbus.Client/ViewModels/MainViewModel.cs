@@ -8,7 +8,6 @@ using NovaModbus.Rtu.Transport;
 namespace NovaModbus.Client.ViewModels;
 
 /// <summary>Root view model: connection lifecycle + embedded virtual test slave.</summary>
-/// <remarks>Watch/Polling tabs are added in a later stage.</remarks>
 public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
 {
     /// <summary>Endpoint published by the embedded test slave.</summary>
@@ -40,6 +39,8 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
         SerialSettings = new SerialPortSettingsViewModel(_bus);
         Connection = new ModbusConnection(CommLog);
         ReadWrite = new ReadWriteViewModel(() => Connection.Client);
+        Watch = new WatchViewModel(() => Connection.Client);
+        Polling = new PollingViewModel(ReadWrite);
         Connection.ConnectionChanged += OnConnectionChanged;
 
         StartTestSlave();
@@ -52,6 +53,12 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
 
     /// <summary>Single-shot function execution tab.</summary>
     public ReadWriteViewModel ReadWrite { get; }
+
+    /// <summary>Watch list tab.</summary>
+    public WatchViewModel Watch { get; }
+
+    /// <summary>Polling tab.</summary>
+    public PollingViewModel Polling { get; }
 
     /// <summary>Raw traffic log.</summary>
     public ObservableLogger CommLog { get; } = new();
@@ -165,6 +172,8 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
         }
 
         _disposed = true;
+        Polling.Dispose();
+        Watch.Dispose();
         StopTestSlave();
         await Connection.DisposeAsync();
         _bus.Unpublish(TestSlaveEndpoint);
