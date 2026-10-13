@@ -1,9 +1,9 @@
-using NovaModbus.Client.Services;
+using NovaModbus.Client.Wpf.Services;
 using NovaModbus.Rtu.Commands;
 using NovaModbus.Rtu;
 using NovaModbus.Rtu.Transport;
 
-namespace NovaModbus.Client.ViewModels;
+namespace NovaModbus.Client.Wpf.ViewModels;
 
 /// <summary>Root view model: connection lifecycle + embedded virtual test slave.</summary>
 public sealed class MainViewModel : ViewModelBase, IAsyncDisposable

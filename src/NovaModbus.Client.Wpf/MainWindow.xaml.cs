@@ -1,9 +1,9 @@
-﻿using System.Windows;
+using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
-using NovaModbus.Client.ViewModels;
+using NovaModbus.Client.Wpf.ViewModels;
 
-namespace NovaModbus.Client;
+namespace NovaModbus.Client.Wpf;
 
 /// <summary>Interaction logic for MainWindow.xaml.</summary>
 public partial class MainWindow : Window

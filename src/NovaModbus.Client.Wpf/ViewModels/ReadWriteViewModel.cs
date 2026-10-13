@@ -1,10 +1,10 @@
 using NovaModbus.Rtu.Commands;
-using NovaModbus.Client.Services;
+using NovaModbus.Client.Wpf.Services;
 using NovaModbus.Rtu;
 using NovaModbus.Rtu.Codecs;
 using NovaModbus.Rtu.Enums;
 
-namespace NovaModbus.Client.ViewModels;
+namespace NovaModbus.Client.Wpf.ViewModels;
 
 /// <summary>Single-shot function-code execution tab.</summary>
 public sealed class ReadWriteViewModel : ViewModelBase

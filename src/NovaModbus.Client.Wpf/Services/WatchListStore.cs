@@ -1,9 +1,9 @@
 using System.IO;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using NovaModbus.Client.ViewModels;
+using NovaModbus.Client.Wpf.ViewModels;
 
-namespace NovaModbus.Client.Services;
+namespace NovaModbus.Client.Wpf.Services;
 
 /// <summary>JSON persistence for watch lists.</summary>
 public static class WatchListStore

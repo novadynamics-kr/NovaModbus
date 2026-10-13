@@ -2,7 +2,7 @@ using System.Collections.ObjectModel;
 using NovaModbus.Rtu.Commands;
 using NovaModbus.Rtu.Transport;
 
-namespace NovaModbus.Client.ViewModels;
+namespace NovaModbus.Client.Wpf.ViewModels;
 
 /// <summary>Serial port settings panel (left side of the client window).</summary>
 public sealed class SerialPortSettingsViewModel : ViewModelBase

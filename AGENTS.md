@@ -15,10 +15,10 @@ Windows .NET 10 기반 Modbus RTU 솔루션용 에이전트 규칙.
 
 - `NovaModbus.sln`
 - `src/NovaModbus.Rtu/` — Modbus RTU 라이브러리, `net10.0`, UI 의존성 없음
-- `src/NovaModbus.Client/` — Modbus Client, WPF, `net10.0-windows`
+- `src/NovaModbus.Client.Wpf/` — Modbus Client, WPF, `net10.0-windows`
 - `src/NovaModbus.Slave/` — Modbus Slave 시뮬레이터 (멀티 ID), WPF, `net10.0-windows`
 - `tests/NovaModbus.Rtu.Tests/` — MSTest, `net10.0`
-- `tests/NovaModbus.Client.Tests/` + `tests/NovaModbus.Slave.Tests/` — MSTest, `net10.0-windows` (순수 로직만, Dispatcher/UI 제외)
+- `tests/NovaModbus.Client.Wpf.Tests/` + `tests/NovaModbus.Slave.Tests/` — MSTest, `net10.0-windows` (순수 로직만, Dispatcher/UI 제외)
 - 언어: 코드·주석 영어, 문서 한국어 가능
 
 ## 2. Hard Constraints (사용자 확정)
@@ -41,7 +41,7 @@ Windows .NET 10 기반 Modbus RTU 솔루션용 에이전트 규칙.
 ```powershell
 dotnet build NovaModbus.slnx -c Release
 dotnet test NovaModbus.slnx -c Release
-dotnet run --project src/NovaModbus.Client -c Debug
+dotnet run --project src/NovaModbus.Client.Wpf -c Debug
 dotnet run --project src/NovaModbus.Slave -c Debug
 ```
 
@@ -99,7 +99,7 @@ Logging/ — IModbusLogger (Action<string> 기반, 외부 로거 의존 없음)
 
 ## 5. 코딩 컨벤션
 
-- 네임스페이스: `NovaModbus.Rtu`, `NovaModbus.Client`, `NovaModbus.Slave` (폴더와 일치).
+- 네임스페이스: `NovaModbus.Rtu`, `NovaModbus.Client.Wpf`, `NovaModbus.Slave` (폴더와 일치).
 - 비동기 메서드는 `Async` 접미사 + `CancellationToken` 기본값. `ConfigureAwait(false)`는 라이브러리에서 사용, WPF ViewModel에서는 미사용.
 - `SerialPort` 직접 노출 금지. 항상 `ISerialTransport` 경유.
 - 매직넘버 금지: FC 코드·예외 코드·타이밍 상수는 enum/const.

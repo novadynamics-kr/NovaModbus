@@ -1,6 +1,6 @@
 using NovaModbus.Rtu;
 
-namespace NovaModbus.Client.Services;
+namespace NovaModbus.Client.Wpf.Services;
 
 /// <summary>Shared value formatting for read results.</summary>
 public static class ValueFormatter

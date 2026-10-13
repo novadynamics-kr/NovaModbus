@@ -1,13 +1,13 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Windows.Data;
-using NovaModbus.Client.Services;
+using NovaModbus.Client.Wpf.Services;
 using NovaModbus.Rtu;
 using NovaModbus.Rtu.Codecs;
 using NovaModbus.Rtu.Collections;
 using NovaModbus.Rtu.Commands;
 
-namespace NovaModbus.Client.ViewModels;
+namespace NovaModbus.Client.Wpf.ViewModels;
 
 /// <summary>Registered watch list (entries + results). Execution lands in stage 2.</summary>
 public sealed class WatchViewModel : ViewModelBase, IDisposable

@@ -1,7 +1,7 @@
-using NovaModbus.Client.Services;
-using NovaModbus.Client.ViewModels;
+using NovaModbus.Client.Wpf.Services;
+using NovaModbus.Client.Wpf.ViewModels;
 
-namespace NovaModbus.Client.Tests;
+namespace NovaModbus.Client.Wpf.Tests;
 
 [TestClass]
 public sealed class WatchEntryTests
