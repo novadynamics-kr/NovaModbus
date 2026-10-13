@@ -3,7 +3,7 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     Title="NovaModbus Client">
-    <Grid x:Name="Root" ColumnSpacing="8">
+    <Grid x:Name="Root" ColumnSpacing="8" Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="300"/>
             <ColumnDefinition Width="*"/>
@@ -126,7 +126,7 @@
                 <ListView Margin="8" FontFamily="Consolas" ItemsSource="{Binding Lines}"/>
             </TabViewItem>
             <TabViewItem IsClosable="False" Header="Watch" DataContext="{Binding Watch}">
-                <Grid Margin="8" RowSpacing="8">
+                <Grid Margin="8" RowSpacing="8" Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
@@ -201,7 +201,7 @@
                             Background="{ThemeResource LayerFillColorDefaultBrush}"
                             BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                             BorderThickness="1" CornerRadius="4" Padding="8">
-                        <Grid RowSpacing="4">
+                        <Grid RowSpacing="4" Background="{ThemeResource LayerFillColorDefaultBrush}">
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/>
@@ -228,7 +228,7 @@
                                 <TextBlock Grid.Column="4" Text="Count" Foreground="Gray"/>
                                 <TextBlock Grid.Column="5" Text="Extra" Foreground="Gray"/>
                             </Grid>
-                            <ListView x:Name="EntriesList" Grid.Row="2" SelectionMode="Multiple" ItemsSource="{Binding Entries}"
+                            <ListView x:Name="EntriesList" Grid.Row="2" SelectionMode="Multiple" Background="{ThemeResource LayerFillColorDefaultBrush}" ItemsSource="{Binding Entries}"
                                       HorizontalContentAlignment="Stretch"
                                       ScrollViewer.HorizontalScrollMode="Disabled"
                                       ScrollViewer.HorizontalScrollBarVisibility="Disabled">
@@ -260,7 +260,7 @@
                             Background="{ThemeResource LayerFillColorDefaultBrush}"
                             BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                             BorderThickness="1" CornerRadius="4" Padding="8">
-                        <Grid RowSpacing="4">
+                        <Grid RowSpacing="4" Background="{ThemeResource LayerFillColorDefaultBrush}">
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/>
@@ -289,7 +289,7 @@
                                 <TextBlock Grid.Column="5" Text="Time" Foreground="Gray"/>
                                 <TextBlock Grid.Column="6" Text="Status" Foreground="Gray"/>
                             </Grid>
-                            <ListView x:Name="ResultsList" Grid.Row="2" SelectionMode="Multiple" ItemsSource="{Binding Results}"
+                            <ListView x:Name="ResultsList" Grid.Row="2" SelectionMode="Multiple" Background="{ThemeResource LayerFillColorDefaultBrush}" ItemsSource="{Binding Results}"
                                       HorizontalContentAlignment="Stretch"
                                       ScrollViewer.HorizontalScrollMode="Disabled"
                                       ScrollViewer.HorizontalScrollBarVisibility="Disabled">
