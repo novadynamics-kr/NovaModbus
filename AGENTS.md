@@ -25,8 +25,11 @@ Windows .NET 10 기반 Modbus RTU 솔루션용 에이전트 규칙.
 1. Serial / Modbus 관련 서드파티 NuGet 금지 (`NModbus`, `EasyModbus`, `FluentModbus`, `RJCP.SerialPortStream` 등).
    - 허용: Microsoft 1st-party `System.IO.Ports` (시리얼 I/O용). 버전은 `dotnet add package` 최신 10.x 고정, `Directory.Packages.props` 미사용 시 각 csproj에 명시.
    - Modbus 프레임·CRC·펑션코덱은 직접 구현. `System.IO.Ports` 외 시리얼 래퍼 금지.
-2. UI·UX 관련 외부 NuGet 금지 (`MahApps`, `MaterialDesignInXaml`, `CommunityToolkit.Mvvm` 포함).
-   - WPF 기본 컨트롤 + XAML만 사용. MVVM은 `INotifyPropertyChanged` 수동 구현.
+2. UI·UX 관련 서드파티 NuGet 금지 (`MahApps`, `MaterialDesignInXaml` 등).
+   - 예외: Microsoft가 유지·게시하는 패키지는 허용 (`Microsoft.WindowsAppSDK`,
+     `CommunityToolkit.*` 등, #27·#28 로드맵, 2026-10-13 승인).
+   - WPF 기존 앱은 기본 컨트롤 + XAML + 수동 `INotifyPropertyChanged` 유지.
+     WinUI 신규 앱의 MVVM 방식은 구현 단계에서 확정.
    - WinForms는 2차 옵션. 추가 시 별도 프로젝트로 분리하고 WPF 코드와 공유 금지.
 3. `NovaModbus.Rtu`는 `net10.0` 유지, WPF·Windows 전용 API 참조 금지 (`-windows` 타깃 금지).
    - 시리얼은 `ISerialTransport`로 추상화. `System.IO.Ports.SerialPort` 어댑터는 Rtu 내부에 두되 `net10.0` 호환 범위만 사용.
