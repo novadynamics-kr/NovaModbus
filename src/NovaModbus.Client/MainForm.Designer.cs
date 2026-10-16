@@ -505,11 +505,11 @@ partial class MainForm
 
     private static Panel Labeled(string text, Control input)
     {
-        Panel panel = new() { AutoSize = true };
-        Label label = new() { Text = text, Dock = DockStyle.Top, AutoSize = true };
-        input.Dock = DockStyle.Top;
-        panel.Controls.Add(input);
+        Panel panel = new() { Width = input.Width, Height = 44 };
+        Label label = new() { Text = text, AutoSize = true, Location = new Point(0, 0) };
+        input.Location = new Point(0, 20);
         panel.Controls.Add(label);
+        panel.Controls.Add(input);
         return panel;
     }
 }
