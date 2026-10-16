@@ -26,8 +26,11 @@ Issue: #30
 - AGENTS.md §1, README 구조·커버리지 갱신.
 
 ## Unresolved / Follow-ups
-- 실행 확인 (`dotnet run --project src/NovaModbus.Client`) — 지시자.
-- `git push nova main` (task 브랜치 절대 푸시 금지) + #30 close는 별도 승인 필요.
+- 없음. 지시자 실측 확인 완료 (65k Add Range → 전체 선택 → 삭제 정상 동작).
+- Stage 7 후속 (지시자 직접 수정): `OnWatchDelete` 선택 개수 조회를
+  `Rows.GetRowCount(DataGridViewElementStates.Selected)`로 교체 (무할당 O(n)).
+- 병합 `f84ad34` + 후속 기록 커밋, gate (build 무경고·209/209) 후
+  `git push nova main`, #30 close. 로컬 task 브랜치 삭제.
 
 ## gh 기록
 - Issue #30 생성 + self-assign (2026-10-16). merge/close 미실시.
