@@ -23,6 +23,11 @@ Verification: `dotnet build` 경고 0·오류 0, `dotnet test` 209/209
   (159+14+33+3, 신규 `RemoveAtIndices` 3종 포함).
   실측 확인은 지시자 몫 (65k Add Range → 전체 선택 → 삭제).
 Deviations: 없음 (지시된 VirtualMode·선택 방식 그대로).
+Follow-up (지시자 직접 수정, 2026-10-16, 동작 확인済):
+- `OnWatchDelete`의 선택 개수 조회 2줄을 `SelectedRows.Count` →
+  `Rows.GetRowCount(DataGridViewElementStates.Selected)`로 교체.
+  `SelectedRows` getter는 65k행 래퍼 할당+정렬을 수반하므로 개수만 필요할 때
+  `GetRowCount`가 O(n) 무할당으로 유리. 부분 삭제의 인덱스 수집 열거는 유지.
 Notes:
 - `BindingList`가 `INPC` 항목을 구독하므로 survivors 재구성이
   `RemoveAt` 반복보다 유리 (O(n) 고정).

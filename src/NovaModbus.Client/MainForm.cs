@@ -449,8 +449,8 @@ public partial class MainForm : Form
         try
         {
             int total = _watch.Entries.Count;
-            int selectedEntries = _entriesGrid.SelectedRows.Count;
-            int selectedResults = _resultsGrid.SelectedRows.Count;
+            int selectedEntries = _entriesGrid.Rows.GetRowCount(DataGridViewElementStates.Selected);
+            int selectedResults = _resultsGrid.Rows.GetRowCount(DataGridViewElementStates.Selected);
             if (selectedEntries == 0 && selectedResults == 0)
             {
                 return;
