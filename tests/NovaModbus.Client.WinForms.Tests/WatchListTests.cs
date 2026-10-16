@@ -121,4 +121,48 @@ public sealed class WatchListTests
         Assert.AreEqual("Error", list.Results[0].Status);
         Assert.IsFalse(list.IsBusy);
     }
+
+    [TestMethod]
+    public async Task RemoveAtIndicesDropsSubsetKeepsOrder()
+    {
+        var list = new WatchList(() => null);
+        list.StartText = "0";
+        list.AddressEndText = "4";
+        list.CountText = "1";
+        await list.AddRangeAsync();
+        Assert.HasCount(5, list.Entries);
+        list.RemoveAtIndices(new HashSet<int> { 1, 3 });
+        Assert.HasCount(3, list.Entries);
+        Assert.HasCount(3, list.Results);
+        ushort[] starts = list.Entries.Select(e => e.Start).ToArray();
+        CollectionAssert.AreEqual(new ushort[] { 0, 2, 4 }, starts);
+        // Results stay 1:1 with entries.
+        for (int i = 0; i < list.Results.Count; i++)
+        {
+            Assert.AreSame(list.Entries[i], list.Results[i].Entry);
+        }
+    }
+
+    [TestMethod]
+    public async Task RemoveAtIndicesAllClears()
+    {
+        var list = new WatchList(() => null);
+        list.StartText = "0";
+        list.AddressEndText = "2";
+        list.CountText = "1";
+        await list.AddRangeAsync();
+        list.RemoveAtIndices(new HashSet<int> { 0, 1, 2 });
+        Assert.HasCount(0, list.Entries);
+        Assert.HasCount(0, list.Results);
+    }
+
+    [TestMethod]
+    public async Task RemoveAtIndicesEmptyIsNoOp()
+    {
+        var list = new WatchList(() => null);
+        list.AddEntry();
+        list.RemoveAtIndices(new HashSet<int>());
+        Assert.HasCount(1, list.Entries);
+        Assert.HasCount(1, list.Results);
+    }
 }

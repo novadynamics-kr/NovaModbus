@@ -286,11 +286,115 @@ public partial class MainForm : Form
         _areaBox.Items.Clear();
         _areaBox.Items.AddRange(_watch.Areas.Cast<object>().ToArray());
         _areaBox.SelectedItem = _watch.Area;
-        _entriesGrid.DataSource = _watch.Entries;
-        _resultsGrid.DataSource = _watch.Results;
         _pollingHistoryBox.DataSource = _polling.History;
         _logBox.DataSource = _log.Lines;
         _watchStatusLabel.Text = _watch.StatusText;
+        SyncRowCounts();
+    }
+
+    /// <summary>Push list counts into the virtual grids (O(1), no per-row work).</summary>
+    private void SyncRowCounts()
+    {
+        bool outer = _syncingGrids;
+        _syncingGrids = true;
+        _entriesGrid.SuspendLayout();
+        _resultsGrid.SuspendLayout();
+        try
+        {
+            _entriesGrid.RowCount = _watch.Entries.Count;
+            _resultsGrid.RowCount = _watch.Results.Count;
+        }
+        finally
+        {
+            _entriesGrid.ResumeLayout();
+            _resultsGrid.ResumeLayout();
+            _syncingGrids = outer;
+        }
+    }
+
+    private bool _syncingGrids;
+
+    /// <summary>Live mirror threshold: above this, mirroring is skipped (delete uses union).</summary>
+    private const int MirrorSelectionThreshold = 2000;
+
+    private void OnEntriesSelectionChanged(object? sender, EventArgs e)
+    {
+        MirrorSelection(_entriesGrid, _resultsGrid);
+    }
+
+    private void OnResultsSelectionChanged(object? sender, EventArgs e)
+    {
+        MirrorSelection(_resultsGrid, _entriesGrid);
+    }
+
+    private void MirrorSelection(DataGridView source, DataGridView target)
+    {
+        if (_syncingGrids)
+        {
+            return;
+        }
+
+        int selected = source.SelectedRows.Count;
+        if (selected == 0)
+        {
+            // Deselection is cheap: single clear, no per-row work.
+            _syncingGrids = true;
+            try
+            {
+                target.ClearSelection();
+            }
+            finally
+            {
+                _syncingGrids = false;
+            }
+
+            return;
+        }
+
+        // Fast path: all rows selected -> single native call, no per-row loop.
+        if (selected == source.RowCount && target.RowCount == source.RowCount)
+        {
+            _syncingGrids = true;
+            try
+            {
+                target.SelectAll();
+            }
+            finally
+            {
+                _syncingGrids = false;
+            }
+
+            return;
+        }
+
+        // Huge partial selections: skip live mirroring to avoid O(n) per-row
+        // assignments on every SelectionChanged (drag would go O(n^2)).
+        // Correctness is preserved: delete collects the union of both grids.
+        if (selected > MirrorSelectionThreshold)
+        {
+            return;
+        }
+
+        _syncingGrids = true;
+        source.SuspendLayout();
+        target.SuspendLayout();
+        try
+        {
+            target.ClearSelection();
+            foreach (DataGridViewRow row in source.SelectedRows)
+            {
+                if (row.Index < target.RowCount)
+                {
+                    target.Rows[row.Index].Selected = true;
+                }
+            }
+        }
+        finally
+        {
+            target.ResumeLayout();
+            source.ResumeLayout();
+            _syncingGrids = false;
+        }
     }
 
     private void SyncWatchFromUi()
@@ -308,6 +412,7 @@ public partial class MainForm : Form
     {
         SyncWatchFromUi();
         _watch.AddEntry();
+        SyncRowCounts();
     }
 
     private async void OnWatchAddRange(object? sender, EventArgs e)
@@ -325,23 +430,134 @@ public partial class MainForm : Form
         {
             timer.Stop();
             _bulkProgressBar.Value = 0;
+            SyncRowCounts();
         }
     }
 
     private void OnWatchDelete(object? sender, EventArgs e)
     {
-        WatchEntry[] doomed = _watch.Entries.Where(x => x.IsSelected).ToArray();
-        if (doomed.Length > 0)
+        if (_watch.Entries.Count == 0)
         {
-            _watch.RemoveEntries(doomed);
+            return;
+        }
+
+        // Suppress live mirroring for the whole operation: RowCount changes and
+        // ClearSelection would otherwise each trigger a mirrored per-row pass.
+        _syncingGrids = true;
+        _entriesGrid.SuspendLayout();
+        _resultsGrid.SuspendLayout();
+        try
+        {
+            int total = _watch.Entries.Count;
+            int selectedEntries = _entriesGrid.SelectedRows.Count;
+            int selectedResults = _resultsGrid.SelectedRows.Count;
+            if (selectedEntries == 0 && selectedResults == 0)
+            {
+                return;
+            }
+
+            // Fast path: everything selected -> single clear, no enumeration.
+            if (selectedEntries >= total || selectedResults >= total)
+            {
+                _entriesGrid.ClearSelection();
+                _resultsGrid.ClearSelection();
+                _watch.ClearAll();
+                SyncRowCounts();
+                return;
+            }
+
+            HashSet<int> doomed = new(selectedEntries + selectedResults);
+            foreach (DataGridViewRow row in _entriesGrid.SelectedRows)
+            {
+                if (row.Index < total)
+                {
+                    doomed.Add(row.Index);
+                }
+            }
+
+            int resultTotal = _watch.Results.Count;
+            foreach (DataGridViewRow row in _resultsGrid.SelectedRows)
+            {
+                if (row.Index < resultTotal)
+                {
+                    doomed.Add(row.Index);
+                }
+            }
+
+            if (doomed.Count == 0)
+            {
+                return;
+            }
+
+            // Deselect BEFORE shrinking RowCount so no selection-cascade fires.
+            _entriesGrid.ClearSelection();
+            _resultsGrid.ClearSelection();
+            _watch.RemoveAtIndices(doomed);
+            SyncRowCounts();
+        }
+        finally
+        {
+            _resultsGrid.ResumeLayout();
+            _entriesGrid.ResumeLayout();
+            _syncingGrids = false;
+            _entriesGrid.Invalidate();
+            _resultsGrid.Invalidate();
         }
     }
 
-    private void OnWatchClearAll(object? sender, EventArgs e) => _watch.ClearAll();
+    private void OnWatchClearAll(object? sender, EventArgs e)
+    {
+        _syncingGrids = true;
+        _entriesGrid.SuspendLayout();
+        _resultsGrid.SuspendLayout();
+        try
+        {
+            _entriesGrid.ClearSelection();
+            _resultsGrid.ClearSelection();
+            _watch.ClearAll();
+            SyncRowCounts();
+        }
+        finally
+        {
+            _resultsGrid.ResumeLayout();
+            _entriesGrid.ResumeLayout();
+            _syncingGrids = false;
+            _entriesGrid.Invalidate();
+            _resultsGrid.Invalidate();
+        }
+    }
 
-    private void OnWatchSelectAll(object? sender, EventArgs e) => _watch.SelectAll();
+    private void OnWatchSelectAll(object? sender, EventArgs e)
+    {
+        // Native grid selection only (no checkbox/IsSelected state).
+        _syncingGrids = true;
+        try
+        {
+            _entriesGrid.SelectAll();
+            _resultsGrid.SelectAll();
+            _watchStatusLabel.Text = $"All {_watch.Entries.Count} entries selected.";
+        }
+        finally
+        {
+            _syncingGrids = false;
+        }
+    }
 
-    private void OnWatchDeselectAll(object? sender, EventArgs e) => _watch.DeselectAll();
+    private void OnWatchDeselectAll(object? sender, EventArgs e)
+    {
+        // Native grid deselection only (no checkbox/IsSelected state).
+        _syncingGrids = true;
+        try
+        {
+            _entriesGrid.ClearSelection();
+            _resultsGrid.ClearSelection();
+            _watchStatusLabel.Text = "Selection cleared.";
+        }
+        finally
+        {
+            _syncingGrids = false;
+        }
+    }
 
     private void OnWatchSave(object? sender, EventArgs e)
     {
@@ -364,7 +580,18 @@ public partial class MainForm : Form
         };
         if (dialog.ShowDialog(this) == DialogResult.OK)
         {
-            _watch.LoadWatchFrom(dialog.FileName);
+            _syncingGrids = true;
+            try
+            {
+                _entriesGrid.ClearSelection();
+                _resultsGrid.ClearSelection();
+                _watch.LoadWatchFrom(dialog.FileName);
+                SyncRowCounts();
+            }
+            finally
+            {
+                _syncingGrids = false;
+            }
         }
     }
 
@@ -379,6 +606,7 @@ public partial class MainForm : Form
         finally
         {
             _readAllButton.Enabled = true;
+            _resultsGrid.Invalidate();
         }
     }
 
@@ -392,7 +620,7 @@ public partial class MainForm : Form
     {
         if (e.Control && e.KeyCode == Keys.A)
         {
-            _watch.SelectAll();
+            OnWatchSelectAll(sender, e);
             e.SuppressKeyPress = true;
         }
         else if (e.KeyCode == Keys.Delete)
@@ -402,20 +630,34 @@ public partial class MainForm : Form
         }
         else if (e.KeyCode == Keys.Escape)
         {
-            _watch.DeselectAll();
+            OnWatchDeselectAll(sender, e);
             e.SuppressKeyPress = true;
         }
     }
 
-    private void OnWatchGridDirty(object? sender, EventArgs e)
+    private void OnEntriesCellValue(object? sender, DataGridViewCellValueEventArgs e)
     {
-        if (sender is DataGridView grid && grid.IsCurrentCellDirty)
+        if (e.RowIndex < 0 || e.RowIndex >= _watch.Entries.Count)
         {
-            grid.CommitEdit(DataGridViewDataErrorContexts.Commit);
+            return;
         }
+
+        WatchEntry entry = _watch.Entries[e.RowIndex];
+        // Strings only: typed values through a text column can raise
+        // FormatException on some cultures/column states.
+        e.Value = e.ColumnIndex switch
+        {
+            0 => entry.SlaveId.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            1 => entry.Area.ToString(),
+            2 => entry.Start.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            3 => entry.AddressHex,
+            4 => entry.Count.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            5 => entry.Extra,
+            _ => null,
+        };
     }
 
-    private void OnResultsFormatting(object? sender, DataGridViewCellFormattingEventArgs e)
+    private void OnResultsCellValue(object? sender, DataGridViewCellValueEventArgs e)
     {
         if (e.RowIndex < 0 || e.RowIndex >= _watch.Results.Count)
         {
@@ -425,16 +667,15 @@ public partial class MainForm : Form
         WatchResult row = _watch.Results[e.RowIndex];
         e.Value = e.ColumnIndex switch
         {
-            1 => row.Entry.SlaveId,
-            2 => row.Entry.Area,
-            3 => row.Entry.Start,
-            4 => row.ValueDecText,
-            5 => row.ValueHexText,
-            6 => row.Timestamp,
-            7 => row.Status,
-            _ => e.Value,
+            0 => row.Entry.SlaveId.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            1 => row.Entry.Area.ToString(),
+            2 => row.Entry.Start.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            3 => row.ValueDecText,
+            4 => row.ValueHexText,
+            5 => row.Timestamp,
+            6 => row.Status,
+            _ => null,
         };
-        e.FormattingApplied = true;
     }
 
     private async void OnPollingStart(object? sender, EventArgs e)

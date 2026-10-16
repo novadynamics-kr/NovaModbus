@@ -1,5 +1,3 @@
-using NovaModbus.Client.ViewModels;
-
 namespace NovaModbus.Client;
 
 #nullable disable
@@ -437,60 +435,55 @@ partial class MainForm
 
     private void SetupWatchGrid(DataGridView grid, bool isEntries)
     {
+        grid.SuspendLayout();
         grid.Dock = DockStyle.Fill;
+        grid.VirtualMode = true;
+        grid.ReadOnly = true;
         grid.AutoGenerateColumns = false;
+        grid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None;
+        grid.AutoSizeRowsMode = DataGridViewAutoSizeRowsMode.None;
         grid.AllowUserToAddRows = false;
         grid.AllowUserToDeleteRows = false;
         grid.RowHeadersVisible = false;
         grid.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
-        grid.MultiSelect = false;
+        grid.MultiSelect = true;
         grid.BackgroundColor = SystemColors.Window;
         grid.KeyDown += OnWatchGridKey;
-        grid.CurrentCellDirtyStateChanged += OnWatchGridDirty;
-
-        DataGridViewCheckBoxColumn selected = new()
-        {
-            DataPropertyName = nameof(WatchEntry.IsSelected),
-            HeaderText = "✓",
-            Width = 30,
-            ReadOnly = false,
-        };
-        grid.Columns.Add(selected);
 
         if (isEntries)
         {
-            grid.Columns.Add(TextColumn(nameof(WatchEntry.SlaveId), "Slave", 60));
-            grid.Columns.Add(TextColumn(nameof(WatchEntry.Area), "Area", 120));
-            grid.Columns.Add(TextColumn(nameof(WatchEntry.Start), "Address", 70));
-            grid.Columns.Add(TextColumn(nameof(WatchEntry.AddressHex), "AddressHex", 80));
-            grid.Columns.Add(TextColumn(nameof(WatchEntry.Count), "Count", 60));
-            grid.Columns.Add(TextColumn(nameof(WatchEntry.Extra), "Extra", -1));
+            grid.Columns.Add(TextColumn("Slave", 60));
+            grid.Columns.Add(TextColumn("Area", 120));
+            grid.Columns.Add(TextColumn("Address", 70));
+            grid.Columns.Add(TextColumn("AddressHex", 80));
+            grid.Columns.Add(TextColumn("Count", 60));
+            grid.Columns.Add(TextColumn("Extra", -1));
+            grid.CellValueNeeded += OnEntriesCellValue;
+            grid.SelectionChanged += OnEntriesSelectionChanged;
         }
         else
         {
-            grid.Columns.Add(TextColumn(null, "Slave", 60));
-            grid.Columns.Add(TextColumn(null, "Area", 120));
-            grid.Columns.Add(TextColumn(null, "Address", 70));
-            grid.Columns.Add(TextColumn(null, "Dec", -1));
-            grid.Columns.Add(TextColumn(null, "Hex", 220));
-            grid.Columns.Add(TextColumn(null, "Time", 110));
-            grid.Columns.Add(TextColumn(null, "Status", 140));
-            grid.CellFormatting += OnResultsFormatting;
+            grid.Columns.Add(TextColumn("Slave", 60));
+            grid.Columns.Add(TextColumn("Area", 120));
+            grid.Columns.Add(TextColumn("Address", 70));
+            grid.Columns.Add(TextColumn("Dec", -1));
+            grid.Columns.Add(TextColumn("Hex", 220));
+            grid.Columns.Add(TextColumn("Time", 110));
+            grid.Columns.Add(TextColumn("Status", 140));
+            grid.CellValueNeeded += OnResultsCellValue;
+            grid.SelectionChanged += OnResultsSelectionChanged;
         }
+
+        grid.ResumeLayout();
     }
 
-    private static DataGridViewTextBoxColumn TextColumn(string property, string header, int width)
+    private static DataGridViewTextBoxColumn TextColumn(string header, int width)
     {
         DataGridViewTextBoxColumn column = new()
         {
             HeaderText = header,
             ReadOnly = true,
         };
-        if (property is not null)
-        {
-            column.DataPropertyName = property;
-        }
-
         if (width < 0)
         {
             column.AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;

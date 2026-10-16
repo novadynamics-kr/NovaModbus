@@ -177,6 +177,81 @@ public sealed class WatchList : IDisposable
         _entryIndex.ExceptWith(doomed);
     }
 
+    /// <summary>Remove rows by index (native grid selection path, no checkbox state).</summary>
+    /// <remarks>O(n) single pass. Delete-all degrades to <see cref="ClearAll"/>.</remarks>
+    public void RemoveAtIndices(IReadOnlyCollection<int> indices)
+    {
+        ArgumentNullException.ThrowIfNull(indices);
+        if (indices.Count == 0 || Entries.Count == 0)
+        {
+            return;
+        }
+
+        // Fast path: everything (or more) selected -> single clear, no per-row work.
+        if (indices.Count >= Entries.Count)
+        {
+            ClearAll();
+            return;
+        }
+
+        HashSet<int> doomed = new(indices);
+
+        int count = Entries.Count;
+        List<WatchEntry> survivors = new(count - doomed.Count);
+        List<WatchResult> survivorRows = new(count - doomed.Count);
+        List<WatchEntry> removed = new(doomed.Count);
+        for (int i = 0; i < count; i++)
+        {
+            if (doomed.Contains(i))
+            {
+                removed.Add(Entries[i]);
+            }
+            else
+            {
+                survivors.Add(Entries[i]);
+                survivorRows.Add(Results[i]);
+            }
+        }
+
+        if (removed.Count == 0)
+        {
+            return;
+        }
+
+        bool raiseEntries = Entries.RaiseListChangedEvents;
+        bool raiseResults = Results.RaiseListChangedEvents;
+        Entries.RaiseListChangedEvents = false;
+        Results.RaiseListChangedEvents = false;
+        try
+        {
+            Entries.Clear();
+            Results.Clear();
+            foreach (WatchEntry entry in survivors)
+            {
+                Entries.Add(entry);
+            }
+
+            foreach (WatchResult row in survivorRows)
+            {
+                Results.Add(row);
+            }
+        }
+        finally
+        {
+            Entries.RaiseListChangedEvents = raiseEntries;
+            Results.RaiseListChangedEvents = raiseResults;
+            Entries.ResetBindings();
+            Results.ResetBindings();
+        }
+
+        foreach (WatchEntry entry in removed)
+        {
+            _entryIndex.Remove(entry);
+        }
+
+        StatusText = $"Removed {removed.Count} entries.";
+    }
+
     /// <summary>Clear all entries and results in one operation.</summary>
     public void ClearAll()
     {
