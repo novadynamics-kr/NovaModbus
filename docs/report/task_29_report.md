@@ -12,6 +12,14 @@ Issue: #29
 - WPF 2종·WinForms 2종: 프레임워크가 NativeAOT 미지원 (+ WinForms 앱의 STJ 리플렉션 직렬화).
 - 테스트 5종: 테스트 호스트 AOT 불가.
 
+## 전 프로젝트 적용 가능성 실측 (2026-10-16, SDK 10.0.400)
+| 프로젝트 | 결과 |
+|---|---|
+| `NovaModbus.Rtu` | ✅ `IsTrimmable` clean (유일 적용 대상·완료) |
+| WPF 2종 | ❌ `NETSDK1168` (트리밍 사용 시 WPF 미지원, 게시 차단) |
+| WinForms 2종 | ❌ `NETSDK1175` (트리밍 사용 시 WinForms 미지원, 게시 차단) |
+| 테스트 5종 | ❌ 컴파일은 성공하나 실행 불가 (게시물 내 `testhost.exe` 동적 로딩 구조) |
+
 ## Deltas
 - `NovaModbus.Rtu.csproj`에 `IsTrimmable` 1줄 (유일 코드 변경).
 - `docs/plans/task_29.md` Replan 섹션.
