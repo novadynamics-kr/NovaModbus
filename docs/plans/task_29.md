@@ -25,6 +25,13 @@ Non-goals: "예외 없이 전부" (기술적으로 불가 영역 존재 — 아�
 - **범위 확정**: Rtu 감사 + WinUI 2종만. WPF/테스트 제외.
 - **순서**: Task 26 병합 → #27 → #28 → #29 (Rtu 감사만 단독 선행 가능).
 
+## Replan (2026-10-16, 자동 승인 진행)
+- Phases 2·3 (WinUI `PublishAot`)은 void: #27 FAILED 종료 (원격 아카이브만 잔존),
+  #28 CANCELLED (미착수). 게시 대상 WinUI 앱이 존재하지 않음.
+- WPF 2종 + WinForms 2종은 프레임워크가 NativeAOT를 미지원 → 게시 적용 불가.
+- 실행 범위 = Phase 1 (Rtu trim/AOT-safe 감사) + 문서화. 본 계획의 "AOT 게시·실행"
+  게이트는 게시 대상 부재로 적용 불가 → "Rtu 트림 경고 0 + 전체 build/test 녹색"으로 대체.
+
 ## Quality gates
 - AOT 게시·실행 / build 경고 0 / test 전체 통과.
 

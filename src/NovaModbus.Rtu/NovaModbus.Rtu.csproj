@@ -7,6 +7,8 @@
     <LangVersion>latest</LangVersion>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <AnalysisMode>Recommended</AnalysisMode>
+    <!-- Task 29: trim/AOT-safety audit gate (library ships trim annotations). -->
+    <IsTrimmable>true</IsTrimmable>
   </PropertyGroup>
 
   <ItemGroup>
