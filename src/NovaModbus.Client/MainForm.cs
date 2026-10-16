@@ -16,6 +16,8 @@ public partial class MainForm : Form
     private readonly ModbusConnection _connection;
     private readonly ReadWriteRunner _runner;
     private readonly WinFormsLogger _log;
+    private readonly WatchList _watch;
+    private readonly PollingRunner _polling;
     private CancellationTokenSource? _slaveCts;
     private VirtualTransport? _slaveHeldTransport;
     private bool _disposed;
@@ -29,11 +31,17 @@ public partial class MainForm : Form
         _options = new SerialPortOptions(_bus);
         _connection = new ModbusConnection(_log);
         _runner = new ReadWriteRunner(() => _connection.Client);
+        _watch = new WatchList(() => _connection.Client);
+        _polling = new PollingRunner(_runner);
         _connection.ConnectionChanged += OnConnectionChanged;
+        _watch.StatusChanged += OnWatchStatus;
+        _polling.IsPollingChanged += OnPollingChanged;
         FillSettings();
         FillReadWrite();
+        FillWatch();
         StartTestSlave();
         RefreshConnectButtons();
+        RefreshPollingButtons();
         FormClosing += OnFormClosing;
     }
 
@@ -210,8 +218,7 @@ public partial class MainForm : Form
         }
     }
 
-    private void OnFunctionChanged(object? sender, EventArgs e)
-    {
+    private void OnFunctionChanged(object? sender, EventArgs e)    {
         if (_functionBox.SelectedItem is NovaModbus.Rtu.Enums.ModbusFunction function)
         {
             _runner.SelectedFunction = function;
@@ -256,8 +263,210 @@ public partial class MainForm : Form
         }
 
         _disposed = true;
+        _polling.Dispose();
+        _watch.Dispose();
         StopTestSlave();
         await _connection.DisposeAsync();
         _bus.Unpublish(TestSlaveEndpoint);
+    }
+
+    private void OnWatchStatus(object? sender, EventArgs e)
+    {
+        if (InvokeRequired)
+        {
+            BeginInvoke(new EventHandler(OnWatchStatus), sender, e);
+            return;
+        }
+
+        _watchStatusLabel.Text = _watch.StatusText;
+    }
+
+    private void FillWatch()
+    {
+        _areaBox.Items.Clear();
+        _areaBox.Items.AddRange(_watch.Areas.Cast<object>().ToArray());
+        _areaBox.SelectedItem = _watch.Area;
+        _entriesGrid.DataSource = _watch.Entries;
+        _resultsGrid.DataSource = _watch.Results;
+        _pollingHistoryBox.DataSource = _polling.History;
+        _logBox.DataSource = _log.Lines;
+        _watchStatusLabel.Text = _watch.StatusText;
+    }
+
+    private void SyncWatchFromUi()
+    {
+        _watch.SlaveIdText = _watchSlaveBox.Text;
+        _watch.Area = _areaBox.SelectedItem is WatchArea area ? area : WatchArea.HoldingRegisters;
+        _watch.StartText = _watchStartBox.Text;
+        _watch.AddressEndText = _watchEndBox.Text;
+        _watch.CountText = _watchCountBox.Text;
+        _watch.ExtraText = _watchExtraBox.Text;
+        _watch.AutoIntervalMsText = _watchIntervalBox.Text;
+    }
+
+    private void OnWatchAdd(object? sender, EventArgs e)
+    {
+        SyncWatchFromUi();
+        _watch.AddEntry();
+    }
+
+    private async void OnWatchAddRange(object? sender, EventArgs e)
+    {
+        SyncWatchFromUi();
+        _bulkProgressBar.Value = 0;
+        using var timer = new System.Windows.Forms.Timer { Interval = 200 };
+        timer.Tick += (_, _) => _bulkProgressBar.Value = Math.Clamp((int)_watch.BulkProgress, 0, 100);
+        timer.Start();
+        try
+        {
+            await _watch.AddRangeAsync();
+        }
+        finally
+        {
+            timer.Stop();
+            _bulkProgressBar.Value = 0;
+        }
+    }
+
+    private void OnWatchDelete(object? sender, EventArgs e)
+    {
+        WatchEntry[] doomed = _watch.Entries.Where(x => x.IsSelected).ToArray();
+        if (doomed.Length > 0)
+        {
+            _watch.RemoveEntries(doomed);
+        }
+    }
+
+    private void OnWatchClearAll(object? sender, EventArgs e) => _watch.ClearAll();
+
+    private void OnWatchSelectAll(object? sender, EventArgs e) => _watch.SelectAll();
+
+    private void OnWatchDeselectAll(object? sender, EventArgs e) => _watch.DeselectAll();
+
+    private void OnWatchSave(object? sender, EventArgs e)
+    {
+        using SaveFileDialog dialog = new()
+        {
+            Filter = "Watch list (*.json)|*.json",
+            FileName = "watchlist.json",
+        };
+        if (dialog.ShowDialog(this) == DialogResult.OK)
+        {
+            _watch.SaveWatchTo(dialog.FileName);
+        }
+    }
+
+    private void OnWatchLoad(object? sender, EventArgs e)
+    {
+        using OpenFileDialog dialog = new()
+        {
+            Filter = "Watch list (*.json)|*.json",
+        };
+        if (dialog.ShowDialog(this) == DialogResult.OK)
+        {
+            _watch.LoadWatchFrom(dialog.FileName);
+        }
+    }
+
+    private async void OnWatchReadAll(object? sender, EventArgs e)
+    {
+        SyncWatchFromUi();
+        _readAllButton.Enabled = false;
+        try
+        {
+            await _watch.ReadAllAsync();
+        }
+        finally
+        {
+            _readAllButton.Enabled = true;
+        }
+    }
+
+    private void OnWatchAutoToggled(object? sender, EventArgs e)
+    {
+        SyncWatchFromUi();
+        _watch.AutoRefresh = _autoRefreshCheck.Checked;
+    }
+
+    private void OnWatchGridKey(object? sender, KeyEventArgs e)
+    {
+        if (e.Control && e.KeyCode == Keys.A)
+        {
+            _watch.SelectAll();
+            e.SuppressKeyPress = true;
+        }
+        else if (e.KeyCode == Keys.Delete)
+        {
+            OnWatchDelete(sender, e);
+            e.SuppressKeyPress = true;
+        }
+        else if (e.KeyCode == Keys.Escape)
+        {
+            _watch.DeselectAll();
+            e.SuppressKeyPress = true;
+        }
+    }
+
+    private void OnWatchGridDirty(object? sender, EventArgs e)
+    {
+        if (sender is DataGridView grid && grid.IsCurrentCellDirty)
+        {
+            grid.CommitEdit(DataGridViewDataErrorContexts.Commit);
+        }
+    }
+
+    private void OnResultsFormatting(object? sender, DataGridViewCellFormattingEventArgs e)
+    {
+        if (e.RowIndex < 0 || e.RowIndex >= _watch.Results.Count)
+        {
+            return;
+        }
+
+        WatchResult row = _watch.Results[e.RowIndex];
+        e.Value = e.ColumnIndex switch
+        {
+            1 => row.Entry.SlaveId,
+            2 => row.Entry.Area,
+            3 => row.Entry.Start,
+            4 => row.ValueDecText,
+            5 => row.ValueHexText,
+            6 => row.Timestamp,
+            7 => row.Status,
+            _ => e.Value,
+        };
+        e.FormattingApplied = true;
+    }
+
+    private async void OnPollingStart(object? sender, EventArgs e)
+    {
+        _polling.IntervalMsText = _pollingIntervalBox.Text;
+        _pollingStartButton.Enabled = false;
+        try
+        {
+            await _polling.StartAsync();
+        }
+        finally
+        {
+            RefreshPollingButtons();
+        }
+    }
+
+    private void OnPollingStop(object? sender, EventArgs e) => _polling.Stop();
+
+    private void OnPollingChanged(object? sender, EventArgs e)
+    {
+        if (InvokeRequired)
+        {
+            BeginInvoke(new EventHandler(OnPollingChanged), sender, e);
+            return;
+        }
+
+        RefreshPollingButtons();
+    }
+
+    private void RefreshPollingButtons()
+    {
+        _pollingStartButton.Enabled = !_polling.IsPolling;
+        _pollingStopButton.Enabled = _polling.IsPolling;
     }
 }

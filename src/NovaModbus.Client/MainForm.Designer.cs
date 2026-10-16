@@ -1,3 +1,5 @@
+using NovaModbus.Client.ViewModels;
+
 namespace NovaModbus.Client;
 
 #nullable disable
@@ -37,8 +39,38 @@ partial class MainForm
     private TextBox _valuesBox;
     private TextBox _resultBox;
     private TabPage _pollingPage;
+    private FlowLayoutPanel _pollingTop;
+    private TextBox _pollingIntervalBox;
+    private Button _pollingStartButton;
+    private Button _pollingStopButton;
+    private ListBox _pollingHistoryBox;
     private TabPage _logPage;
+    private ListBox _logBox;
     private TabPage _watchPage;
+    private FlowLayoutPanel _watchTop;
+    private TextBox _watchSlaveBox;
+    private ComboBox _areaBox;
+    private TextBox _watchStartBox;
+    private TextBox _watchEndBox;
+    private TextBox _watchCountBox;
+    private TextBox _watchExtraBox;
+    private Button _watchAddButton;
+    private Button _watchAddRangeButton;
+    private Button _watchDeleteButton;
+    private Button _watchClearAllButton;
+    private Button _watchSelectAllButton;
+    private Button _watchDeselectAllButton;
+    private Button _watchSaveButton;
+    private Button _watchLoadButton;
+    private FlowLayoutPanel _watchMid;
+    private Button _readAllButton;
+    private CheckBox _autoRefreshCheck;
+    private TextBox _watchIntervalBox;
+    private ProgressBar _bulkProgressBar;
+    private Label _watchStatusLabel;
+    private SplitContainer _watchSplit;
+    private DataGridView _entriesGrid;
+    private DataGridView _resultsGrid;
     private StatusStrip _status;
     private ToolStripStatusLabel _statusLabel;
 
@@ -89,8 +121,38 @@ partial class MainForm
         _valuesBox = new TextBox();
         _resultBox = new TextBox();
         _pollingPage = new TabPage();
+        _pollingTop = new FlowLayoutPanel();
+        _pollingIntervalBox = new TextBox();
+        _pollingStartButton = new Button();
+        _pollingStopButton = new Button();
+        _pollingHistoryBox = new ListBox();
         _logPage = new TabPage();
+        _logBox = new ListBox();
         _watchPage = new TabPage();
+        _watchTop = new FlowLayoutPanel();
+        _watchSlaveBox = new TextBox();
+        _areaBox = new ComboBox();
+        _watchStartBox = new TextBox();
+        _watchEndBox = new TextBox();
+        _watchCountBox = new TextBox();
+        _watchExtraBox = new TextBox();
+        _watchAddButton = new Button();
+        _watchAddRangeButton = new Button();
+        _watchDeleteButton = new Button();
+        _watchClearAllButton = new Button();
+        _watchSelectAllButton = new Button();
+        _watchDeselectAllButton = new Button();
+        _watchSaveButton = new Button();
+        _watchLoadButton = new Button();
+        _watchMid = new FlowLayoutPanel();
+        _readAllButton = new Button();
+        _autoRefreshCheck = new CheckBox();
+        _watchIntervalBox = new TextBox();
+        _bulkProgressBar = new ProgressBar();
+        _watchStatusLabel = new Label();
+        _watchSplit = new SplitContainer();
+        _entriesGrid = new DataGridView();
+        _resultsGrid = new DataGridView();
         _status = new StatusStrip();
         _statusLabel = new ToolStripStatusLabel();
         _settingsPanel.SuspendLayout();
@@ -194,6 +256,117 @@ partial class MainForm
         _watchPage.UseVisualStyleBackColor = true;
         _tabs.TabPages.AddRange([_readWritePage, _pollingPage, _logPage, _watchPage]);
 
+        _pollingTop.Dock = DockStyle.Top;
+        _pollingTop.AutoSize = true;
+        _pollingTop.Padding = new Padding(8);
+        _pollingIntervalBox.Width = 100;
+        _pollingIntervalBox.Text = "1000";
+        _pollingStartButton.Text = "Start";
+        _pollingStartButton.AutoSize = true;
+        _pollingStartButton.Click += OnPollingStart;
+        _pollingStopButton.Text = "Stop";
+        _pollingStopButton.AutoSize = true;
+        _pollingStopButton.Click += OnPollingStop;
+        _pollingHistoryBox.Dock = DockStyle.Fill;
+        _pollingHistoryBox.Font = new Font("Consolas", 9F);
+        _pollingTop.Controls.Add(Labeled("Interval (ms)", _pollingIntervalBox));
+        _pollingTop.Controls.Add(_pollingStartButton);
+        _pollingTop.Controls.Add(_pollingStopButton);
+        _pollingStartButton.Margin = new Padding(0, 15, 0, 0);
+        _pollingStopButton.Margin = new Padding(0, 15, 0, 0);
+        _pollingPage.Controls.Add(_pollingHistoryBox);
+        _pollingPage.Controls.Add(_pollingTop);
+
+        _logBox.Dock = DockStyle.Fill;
+        _logBox.Font = new Font("Consolas", 9F);
+        _logPage.Controls.Add(_logBox);
+
+        _watchTop.Dock = DockStyle.Top;
+        _watchTop.AutoSize = true;
+        _watchTop.Padding = new Padding(8);
+        _watchSlaveBox.Width = 70;
+        _watchSlaveBox.Text = "1";
+        _areaBox.DropDownStyle = ComboBoxStyle.DropDownList;
+        _areaBox.Width = 140;
+        _watchStartBox.Width = 80;
+        _watchStartBox.Text = "0";
+        _watchEndBox.Width = 80;
+        _watchEndBox.Text = "9";
+        _watchCountBox.Width = 80;
+        _watchCountBox.Text = "1";
+        _watchExtraBox.Width = 140;
+        _watchAddButton.Text = "Add";
+        _watchAddButton.AutoSize = true;
+        _watchAddButton.Click += OnWatchAdd;
+        _watchAddRangeButton.Text = "Add Range";
+        _watchAddRangeButton.AutoSize = true;
+        _watchAddRangeButton.Click += OnWatchAddRange;
+        _watchDeleteButton.Text = "Del";
+        _watchDeleteButton.AutoSize = true;
+        _watchDeleteButton.Click += OnWatchDelete;
+        _watchClearAllButton.Text = "Clear All";
+        _watchClearAllButton.AutoSize = true;
+        _watchClearAllButton.Click += OnWatchClearAll;
+        _watchSelectAllButton.Text = "Select All";
+        _watchSelectAllButton.AutoSize = true;
+        _watchSelectAllButton.Click += OnWatchSelectAll;
+        _watchDeselectAllButton.Text = "Deselect All";
+        _watchDeselectAllButton.AutoSize = true;
+        _watchDeselectAllButton.Click += OnWatchDeselectAll;
+        _watchSaveButton.Text = "Save";
+        _watchSaveButton.AutoSize = true;
+        _watchSaveButton.Click += OnWatchSave;
+        _watchLoadButton.Text = "Load";
+        _watchLoadButton.AutoSize = true;
+        _watchLoadButton.Click += OnWatchLoad;
+        _watchTop.Controls.Add(Labeled("Slave ID", _watchSlaveBox));
+        _watchTop.Controls.Add(Labeled("Area", _areaBox));
+        _watchTop.Controls.Add(Labeled("Address (dec/0x)", _watchStartBox));
+        _watchTop.Controls.Add(Labeled("End (dec/0x)", _watchEndBox));
+        _watchTop.Controls.Add(Labeled("Count / Record", _watchCountBox));
+        _watchTop.Controls.Add(Labeled("Extra (diag data / file len)", _watchExtraBox));
+        _watchTop.Controls.Add(_watchAddButton);
+        _watchTop.Controls.Add(_watchAddRangeButton);
+        _watchTop.Controls.Add(_watchDeleteButton);
+        _watchTop.Controls.Add(_watchClearAllButton);
+        _watchTop.Controls.Add(_watchSelectAllButton);
+        _watchTop.Controls.Add(_watchDeselectAllButton);
+        _watchTop.Controls.Add(_watchSaveButton);
+        _watchTop.Controls.Add(_watchLoadButton);
+
+        _watchMid.Dock = DockStyle.Top;
+        _watchMid.AutoSize = true;
+        _watchMid.Padding = new Padding(8, 0, 8, 0);
+        _readAllButton.Text = "Read All";
+        _readAllButton.AutoSize = true;
+        _readAllButton.Click += OnWatchReadAll;
+        _autoRefreshCheck.Text = "Auto-refresh";
+        _autoRefreshCheck.AutoSize = true;
+        _autoRefreshCheck.CheckedChanged += OnWatchAutoToggled;
+        _watchIntervalBox.Width = 80;
+        _watchIntervalBox.Text = "1000";
+        _bulkProgressBar.Width = 120;
+        _bulkProgressBar.Minimum = 0;
+        _bulkProgressBar.Maximum = 100;
+        _watchStatusLabel.AutoSize = true;
+        _watchMid.Controls.Add(_readAllButton);
+        _watchMid.Controls.Add(_autoRefreshCheck);
+        _watchMid.Controls.Add(_watchIntervalBox);
+        _watchMid.Controls.Add(new Label { Text = "ms", AutoSize = true });
+        _watchMid.Controls.Add(_bulkProgressBar);
+        _watchMid.Controls.Add(_watchStatusLabel);
+
+        _watchSplit.Dock = DockStyle.Fill;
+        _watchSplit.Orientation = Orientation.Horizontal;
+        SetupWatchGrid(_entriesGrid, true);
+        SetupWatchGrid(_resultsGrid, false);
+        _watchSplit.Panel1.Controls.Add(_entriesGrid);
+        _watchSplit.Panel2.Controls.Add(_resultsGrid);
+
+        _watchPage.Controls.Add(_watchSplit);
+        _watchPage.Controls.Add(_watchMid);
+        _watchPage.Controls.Add(_watchTop);
+
         _readWriteTop.Dock = DockStyle.Top;
         _readWriteTop.AutoSize = true;
         _readWriteTop.Padding = new Padding(8);
@@ -260,6 +433,74 @@ partial class MainForm
         _status.PerformLayout();
         ResumeLayout(false);
         PerformLayout();
+    }
+
+    private void SetupWatchGrid(DataGridView grid, bool isEntries)
+    {
+        grid.Dock = DockStyle.Fill;
+        grid.AutoGenerateColumns = false;
+        grid.AllowUserToAddRows = false;
+        grid.AllowUserToDeleteRows = false;
+        grid.RowHeadersVisible = false;
+        grid.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
+        grid.MultiSelect = false;
+        grid.BackgroundColor = SystemColors.Window;
+        grid.KeyDown += OnWatchGridKey;
+        grid.CurrentCellDirtyStateChanged += OnWatchGridDirty;
+
+        DataGridViewCheckBoxColumn selected = new()
+        {
+            DataPropertyName = nameof(WatchEntry.IsSelected),
+            HeaderText = "✓",
+            Width = 30,
+            ReadOnly = false,
+        };
+        grid.Columns.Add(selected);
+
+        if (isEntries)
+        {
+            grid.Columns.Add(TextColumn(nameof(WatchEntry.SlaveId), "Slave", 60));
+            grid.Columns.Add(TextColumn(nameof(WatchEntry.Area), "Area", 120));
+            grid.Columns.Add(TextColumn(nameof(WatchEntry.Start), "Address", 70));
+            grid.Columns.Add(TextColumn(nameof(WatchEntry.AddressHex), "AddressHex", 80));
+            grid.Columns.Add(TextColumn(nameof(WatchEntry.Count), "Count", 60));
+            grid.Columns.Add(TextColumn(nameof(WatchEntry.Extra), "Extra", -1));
+        }
+        else
+        {
+            grid.Columns.Add(TextColumn(null, "Slave", 60));
+            grid.Columns.Add(TextColumn(null, "Area", 120));
+            grid.Columns.Add(TextColumn(null, "Address", 70));
+            grid.Columns.Add(TextColumn(null, "Dec", -1));
+            grid.Columns.Add(TextColumn(null, "Hex", 220));
+            grid.Columns.Add(TextColumn(null, "Time", 110));
+            grid.Columns.Add(TextColumn(null, "Status", 140));
+            grid.CellFormatting += OnResultsFormatting;
+        }
+    }
+
+    private static DataGridViewTextBoxColumn TextColumn(string property, string header, int width)
+    {
+        DataGridViewTextBoxColumn column = new()
+        {
+            HeaderText = header,
+            ReadOnly = true,
+        };
+        if (property is not null)
+        {
+            column.DataPropertyName = property;
+        }
+
+        if (width < 0)
+        {
+            column.AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
+        }
+        else
+        {
+            column.Width = width;
+        }
+
+        return column;
     }
 
     private static Panel Labeled(string text, Control input)
