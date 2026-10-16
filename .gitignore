@@ -9,6 +9,8 @@
 /src/NovaModbus.Client/obj
 /src/NovaModbus.Rtu/bin
 /src/NovaModbus.Rtu/obj
+/src/NovaModbus.SlaveWPF/bin
+/src/NovaModbus.SlaveWPF/obj
 /src/NovaModbus.Slave/bin
 /src/NovaModbus.Slave/obj
 /tests/NovaModbus.Rtu.Tests/bin
@@ -24,8 +26,10 @@
 /tests/NovaModbus.Client.Tests/obj
 /tests/NovaModbus.Client.Wpf.Tests/bin
 /tests/NovaModbus.Client.Wpf.Tests/obj
-/tests/NovaModbus.Slave.Tests/bin
-/tests/NovaModbus.Slave.Tests/obj
+/tests/NovaModbus.SlaveWPF.Tests/bin
+/tests/NovaModbus.SlaveWPF.Tests/obj
+/tests/NovaModbus.Slave.WinForms.Tests/bin
+/tests/NovaModbus.Slave.WinForms.Tests/obj
 **/TestResults
 coverage-report/
 coverage.xml

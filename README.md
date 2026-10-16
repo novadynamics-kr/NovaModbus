@@ -10,11 +10,13 @@ NovaModbus.slnx
 ├── src/NovaModbus.Rtu/ ...... 라이브러리 (net10.0, UI 의존성 없음)
 ├── src/NovaModbus.ClientWPF/ ... Modbus Client (WPF, net10.0-windows)
 ├── src/NovaModbus.Client/ ... Modbus Client (WinForms, net10.0-windows)
-├── src/NovaModbus.Slave/ .... Slave 시뮬레이터, 멀티 ID (WPF)
+├── src/NovaModbus.SlaveWPF/ .... Slave 시뮬레이터, 멀티 ID (WPF)
+├── src/NovaModbus.Slave/ ...... Slave 시뮬레이터, 멀티 ID (WinForms, net10.0-windows)
 ├── tests/NovaModbus.Rtu.Tests/ (MSTest, net10.0)
 ├── tests/NovaModbus.ClientWPF.Tests/ (MSTest, net10.0-windows, 순수 로직)
 ├── tests/NovaModbus.Client.WinForms.Tests/ (MSTest, net10.0-windows, 순수 로직)
-└── tests/NovaModbus.Slave.Tests/ (MSTest, net10.0-windows, 순수 로직)
+├── tests/NovaModbus.SlaveWPF.Tests/ (MSTest, net10.0-windows, 순수 로직)
+└── tests/NovaModbus.Slave.WinForms.Tests/ (MSTest, net10.0-windows, 순수 로직)
 ```
 
 지원 Function: `01,02,03,04,05,06,07,08,0B,0C,0F,10,11,14,15,16,17,18` +
@@ -43,7 +45,7 @@ Exception 응답 (`01-08,0A,0B`). 제외: `2B`/MEI, 사용자 정의 FC.
 dotnet build NovaModbus.slnx -c Release
 dotnet test NovaModbus.slnx -c Release
 dotnet run --project src/NovaModbus.ClientWPF -c Debug
-dotnet run --project src/NovaModbus.Slave -c Debug
+dotnet run --project src/NovaModbus.SlaveWPF -c Debug
 ```
 
 단일 테스트:
@@ -62,8 +64,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File coverage.ps1
 흐름: MSTest 이중 수집 (`XPlat Code Coverage` coverlet → 라인+브랜치 Cobertura,
 `Code Coverage` Microsoft → VS용 `.coverage`) → HTML 생성 (`reportgenerator`).
 `CodeCoverage.runsettings`가 `*Tests.dll`을 측정에서 제외하므로
-결과에는 4개 제품 어셈블리(`NovaModbus.Rtu`/`NovaModbus.Client`/`NovaModbus.ClientWPF`/
-`NovaModbus.Slave`)만 포함된다 (Client/Slave는 각 테스트 프로젝트가 순수 로직을 커버).
+결과에는 5개 제품 어셈블리(`NovaModbus.Rtu`/`NovaModbus.Client`/`NovaModbus.ClientWPF`/
+`NovaModbus.Slave`/`NovaModbus.SlaveWPF`)만 포함된다 (Client/Slave는 각 테스트 프로젝트가 순수 로직을 커버).
 `coverage-report/index.html`을 열어 확인한다 (라인·브랜치·클래스별 상세).
 필요 도구는 `dotnet-tools.json`에 버전 고정되어 스크립트가 자동 복원한다.
 수집물(`TestResults/`, `coverage-report/`)은 커밋하지 않는다.

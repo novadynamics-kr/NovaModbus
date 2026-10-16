@@ -5,7 +5,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using NovaModbus.Rtu.Collections;
 
-namespace NovaModbus.Slave.Helpers;
+namespace NovaModbus.SlaveWPF.Helpers;
 
 /// <summary>
 /// Attached mouse + keyboard multi-select for large virtualized DataGrids.

@@ -1,8 +1,8 @@
 using System.Globalization;
 using System.Windows;
-using NovaModbus.Slave.ViewModels;
+using NovaModbus.SlaveWPF.ViewModels;
 
-namespace NovaModbus.Slave.Views;
+namespace NovaModbus.SlaveWPF.Views;
 
 /// <summary>Float write dialog for one holding address.</summary>
 public partial class FloatInputDialog : Window

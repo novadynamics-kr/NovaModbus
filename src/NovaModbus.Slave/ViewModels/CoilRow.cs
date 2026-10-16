@@ -22,6 +22,9 @@ public sealed class CoilRow : ViewModelBase, ISelectable
     /// <summary>Coil address (read-only).</summary>
     public ushort Address { get; }
 
+    /// <summary>Address as hex (read-only, e.g. 0x000A).</summary>
+    public string AddressHex => $"0x{Address:X4}";
+
     /// <summary>Coil state; commits on change.</summary>
     public bool IsOn
     {
@@ -46,7 +49,7 @@ public sealed class CoilRow : ViewModelBase, ISelectable
         }
     }
 
-    /// <summary>Selection state for batched UI selection.</summary>
+    /// <summary>Selection state (kept for parity; the WinForms UI uses native grid selection).</summary>
     public bool IsSelected
     {
         get => _isSelected;
