@@ -20,10 +20,13 @@
 /src/NovaModbus.Client.Wpf/obj
 /tests/NovaModbus.Client.Tests/bin
 /tests/NovaModbus.Client.Tests/obj
+/tests/NovaModbus.Client.Wpf.Tests/bin
+/tests/NovaModbus.Client.Wpf.Tests/obj
 /tests/NovaModbus.Slave.Tests/bin
 /tests/NovaModbus.Slave.Tests/obj
 **/TestResults
 coverage-report/
 coverage.xml
+*.user
 
 .fake
