@@ -28,6 +28,8 @@
 /tests/NovaModbus.Client.Wpf.Tests/obj
 /tests/NovaModbus.SlaveWPF.Tests/bin
 /tests/NovaModbus.SlaveWPF.Tests/obj
+/tests/NovaModbus.Slave.WinForms.Tests/bin
+/tests/NovaModbus.Slave.WinForms.Tests/obj
 **/TestResults
 coverage-report/
 coverage.xml

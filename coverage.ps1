@@ -14,6 +14,7 @@ $reports = @(
     'tests/NovaModbus.ClientWPF.Tests',
     'tests/NovaModbus.Client.WinForms.Tests',
     'tests/NovaModbus.SlaveWPF.Tests',
+    'tests/NovaModbus.Slave.WinForms.Tests'
 ) | ForEach-Object {
     Get-ChildItem "$_/TestResults" -Recurse -Filter coverage.cobertura.xml -ErrorAction SilentlyContinue |
         Sort-Object LastWriteTime |

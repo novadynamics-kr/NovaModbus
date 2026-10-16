@@ -11,5 +11,6 @@
     <Project Path="tests/NovaModbus.ClientWPF.Tests/NovaModbus.ClientWPF.Tests.csproj" />
     <Project Path="tests/NovaModbus.Client.WinForms.Tests/NovaModbus.Client.WinForms.Tests.csproj" />
     <Project Path="tests/NovaModbus.SlaveWPF.Tests/NovaModbus.SlaveWPF.Tests.csproj" />
+    <Project Path="tests/NovaModbus.Slave.WinForms.Tests/NovaModbus.Slave.WinForms.Tests.csproj" />
   </Folder>
 </Solution>
