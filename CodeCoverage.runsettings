@@ -18,7 +18,7 @@
         <Configuration>
           <!-- Measure product assemblies only; test assemblies stay excluded. -->
           <Include>[NovaModbus.Rtu]*,[NovaModbus.Client]*,[NovaModbus.ClientWPF]*,[NovaModbus.Slave]*</Include>
-          <Exclude>[NovaModbus.Rtu.Tests]*,[NovaModbus.Client.Tests]*,[NovaModbus.ClientWPF.Tests]*,[NovaModbus.Slave.Tests]*</Exclude>
+          <Exclude>[NovaModbus.Rtu.Tests]*,[NovaModbus.Client.Tests]*,[NovaModbus.ClientWPF.Tests]*,[NovaModbus.Client.WinForms.Tests]*,[NovaModbus.Slave.Tests]*</Exclude>
           <ExcludeByFile>**/tests/**</ExcludeByFile>
         </Configuration>
       </DataCollector>

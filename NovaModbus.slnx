@@ -8,6 +8,7 @@
   <Folder Name="/tests/">
     <Project Path="tests/NovaModbus.Rtu.Tests/NovaModbus.Rtu.Tests.csproj" />
     <Project Path="tests/NovaModbus.ClientWPF.Tests/NovaModbus.ClientWPF.Tests.csproj" />
+    <Project Path="tests/NovaModbus.Client.WinForms.Tests/NovaModbus.Client.WinForms.Tests.csproj" />
     <Project Path="tests/NovaModbus.Slave.Tests/NovaModbus.Slave.Tests.csproj" />
   </Folder>
 </Solution>
