@@ -29,8 +29,9 @@ Issue: #31
 - AGENTS.md §1, README 구조·커버리지 갱신.
 
 ## Unresolved / Follow-ups
-- 실행 확인 (`dotnet run --project src/NovaModbus.Slave`) — 지시자.
-- `git push nova main` (task 브랜치 절대 푸시 금지) + #31 close는 별도 승인 필요.
+- 없음. 지시자 실측 확인 완료 (실행 스모크: 설정·툴바·그리드 전부 표시).
+- 병합 `1dbed54` + 후속 기록 커밋, gate (build 무경고·233/233) 후
+  `git push nova main`, #31 close. 로컬 task 브랜치 삭제.
 
 ## gh 기록
 - Issue #31 생성 + self-assign (2026-10-16). merge/close 미실시.
