@@ -1,4 +1,4 @@
-namespace NovaModbus.Slave.ViewModels;
+namespace NovaModbus.SlaveWPF.ViewModels;
 
 using NovaModbus.Rtu.Collections;
 

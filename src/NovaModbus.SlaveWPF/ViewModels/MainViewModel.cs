@@ -9,9 +9,9 @@ using NovaModbus.Rtu.Codecs;
 using NovaModbus.Rtu.Collections;
 using NovaModbus.Rtu.Commands;
 using NovaModbus.Rtu.Transport;
-using NovaModbus.Slave.Services;
+using NovaModbus.SlaveWPF.Services;
 
-namespace NovaModbus.Slave.ViewModels;
+namespace NovaModbus.SlaveWPF.ViewModels;
 
 /// <summary>Root view model: listener lifecycle, slave IDs, data editing, counters.</summary>
 public sealed class MainViewModel : ViewModelBase, IAsyncDisposable

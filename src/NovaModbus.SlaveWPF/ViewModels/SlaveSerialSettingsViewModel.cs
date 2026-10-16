@@ -2,7 +2,7 @@ using System.Collections.ObjectModel;
 using NovaModbus.Rtu.Commands;
 using NovaModbus.Rtu.Transport;
 
-namespace NovaModbus.Slave.ViewModels;
+namespace NovaModbus.SlaveWPF.ViewModels;
 
 /// <summary>Serial port settings for the slave listener.</summary>
 public sealed class SlaveSerialSettingsViewModel : ViewModelBase

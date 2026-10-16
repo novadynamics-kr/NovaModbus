@@ -1,7 +1,7 @@
 using System.IO;
 using System.Text.Json;
 
-namespace NovaModbus.Slave.Services;
+namespace NovaModbus.SlaveWPF.Services;
 
 /// <summary>JSON persistence for user register maps (per slave ID).</summary>
 public static class RegisterMapStore

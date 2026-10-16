@@ -3,7 +3,7 @@ using System.Windows.Threading;
 using NovaModbus.Rtu;
 using NovaModbus.Rtu.Logging;
 
-namespace NovaModbus.Slave.Services;
+namespace NovaModbus.SlaveWPF.Services;
 
 /// <summary><see cref="IModbusLogger"/> binding to a capped line list (UI thread marshalled).</summary>
 public sealed class ObservableLog : IModbusLogger

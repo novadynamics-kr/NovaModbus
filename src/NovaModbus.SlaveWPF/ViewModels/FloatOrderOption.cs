@@ -1,6 +1,6 @@
 using NovaModbus.Rtu.Codecs;
 
-namespace NovaModbus.Slave.ViewModels;
+namespace NovaModbus.SlaveWPF.ViewModels;
 
 /// <summary>Float word order choice with an Endian display name.</summary>
 /// <param name="Order">Codec order.</param>

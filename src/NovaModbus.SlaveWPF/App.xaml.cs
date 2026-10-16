@@ -1,8 +1,8 @@
-﻿using System.Configuration;
+using System.Configuration;
 using System.Data;
 using System.Windows;
 
-namespace NovaModbus.Slave;
+namespace NovaModbus.SlaveWPF;
 
 /// <summary>
 /// Interaction logic for App.xaml

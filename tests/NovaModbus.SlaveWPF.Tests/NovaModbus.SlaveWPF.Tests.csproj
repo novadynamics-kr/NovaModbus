@@ -24,7 +24,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\NovaModbus.Slave\NovaModbus.Slave.csproj" />
+    <ProjectReference Include="..\..\src\NovaModbus.SlaveWPF\NovaModbus.SlaveWPF.csproj" />
     <ProjectReference Include="..\..\src\NovaModbus.Rtu\NovaModbus.Rtu.csproj" />
   </ItemGroup>
 

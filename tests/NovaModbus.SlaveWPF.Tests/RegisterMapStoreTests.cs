@@ -1,6 +1,6 @@
-using NovaModbus.Slave.Services;
+using NovaModbus.SlaveWPF.Services;
 
-namespace NovaModbus.Slave.Tests;
+namespace NovaModbus.SlaveWPF.Tests;
 
 [TestClass]
 public sealed class RegisterMapStoreTests

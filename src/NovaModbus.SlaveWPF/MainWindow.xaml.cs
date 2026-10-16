@@ -1,11 +1,11 @@
-﻿using System.Windows;
+using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
-using NovaModbus.Slave.ViewModels;
-using NovaModbus.Slave.Views;
+using NovaModbus.SlaveWPF.ViewModels;
+using NovaModbus.SlaveWPF.Views;
 
-namespace NovaModbus.Slave;
+namespace NovaModbus.SlaveWPF;
 
 /// <summary>Interaction logic for MainWindow.xaml.</summary>
 public partial class MainWindow : Window

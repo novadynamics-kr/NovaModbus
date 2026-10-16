@@ -17,8 +17,8 @@
       <DataCollector friendlyName="XPlat Code Coverage">
         <Configuration>
           <!-- Measure product assemblies only; test assemblies stay excluded. -->
-          <Include>[NovaModbus.Rtu]*,[NovaModbus.Client]*,[NovaModbus.ClientWPF]*,[NovaModbus.Slave]*</Include>
-          <Exclude>[NovaModbus.Rtu.Tests]*,[NovaModbus.Client.Tests]*,[NovaModbus.ClientWPF.Tests]*,[NovaModbus.Client.WinForms.Tests]*,[NovaModbus.Slave.Tests]*</Exclude>
+          <Include>[NovaModbus.Rtu]*,[NovaModbus.Client]*,[NovaModbus.ClientWPF]*,[NovaModbus.Slave]*,[NovaModbus.SlaveWPF]*</Include>
+          <Exclude>[NovaModbus.Rtu.Tests]*,[NovaModbus.Client.Tests]*,[NovaModbus.ClientWPF.Tests]*,[NovaModbus.Client.WinForms.Tests]*,[NovaModbus.Slave.Tests]*,[NovaModbus.SlaveWPF.Tests]*,[NovaModbus.Slave.WinForms.Tests]*</Exclude>
           <ExcludeByFile>**/tests/**</ExcludeByFile>
         </Configuration>
       </DataCollector>
