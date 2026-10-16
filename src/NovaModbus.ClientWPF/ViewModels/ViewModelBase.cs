@@ -1,7 +1,7 @@
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 
-namespace NovaModbus.Client.ViewModels;
+namespace NovaModbus.ClientWPF.ViewModels;
 
 /// <summary>Manual INotifyPropertyChanged base (no external MVVM toolkit).</summary>
 public abstract class ViewModelBase : INotifyPropertyChanged

@@ -1,10 +1,10 @@
-﻿<Window x:Class="NovaModbus.Client.MainWindow"
+<Window x:Class="NovaModbus.ClientWPF.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        xmlns:local="clr-namespace:NovaModbus.Client"
-        xmlns:helpers="clr-namespace:NovaModbus.Client.Helpers"
+        xmlns:local="clr-namespace:NovaModbus.ClientWPF"
+        xmlns:helpers="clr-namespace:NovaModbus.ClientWPF.Helpers"
         mc:Ignorable="d"
         Title="NovaModbus Client" Height="600" Width="900">
     <Grid>

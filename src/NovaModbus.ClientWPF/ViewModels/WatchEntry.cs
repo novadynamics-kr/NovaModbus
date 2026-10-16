@@ -1,6 +1,6 @@
 using System.ComponentModel;
 
-namespace NovaModbus.Client.ViewModels;
+namespace NovaModbus.ClientWPF.ViewModels;
 
 using NovaModbus.Rtu.Collections;
 

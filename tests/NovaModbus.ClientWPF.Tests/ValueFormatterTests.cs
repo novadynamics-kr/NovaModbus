@@ -1,6 +1,6 @@
-using NovaModbus.Client.Services;
+using NovaModbus.ClientWPF.Services;
 
-namespace NovaModbus.Client.Tests;
+namespace NovaModbus.ClientWPF.Tests;
 
 [TestClass]
 public sealed class ValueFormatterTests

@@ -1,4 +1,4 @@
-namespace NovaModbus.Client.ViewModels;
+namespace NovaModbus.ClientWPF.ViewModels;
 
 /// <summary>Watchable Modbus areas.</summary>
 public enum WatchArea

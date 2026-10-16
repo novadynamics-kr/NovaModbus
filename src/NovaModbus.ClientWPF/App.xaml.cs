@@ -1,8 +1,8 @@
-﻿using System.Configuration;
+using System.Configuration;
 using System.Data;
 using System.Windows;
 
-namespace NovaModbus.Client;
+namespace NovaModbus.ClientWPF;
 
 /// <summary>
 /// Interaction logic for App.xaml
