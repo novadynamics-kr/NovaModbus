@@ -11,6 +11,8 @@
 /src/NovaModbus.Rtu/obj
 /src/NovaModbus.SlaveWPF/bin
 /src/NovaModbus.SlaveWPF/obj
+/src/NovaModbus.Slave/bin
+/src/NovaModbus.Slave/obj
 /tests/NovaModbus.Rtu.Tests/bin
 /tests/NovaModbus.Rtu.Tests/obj
 /tests/NovaModbus.ClientWPF.Tests/bin

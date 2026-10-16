@@ -4,6 +4,7 @@
     <Project Path="src/NovaModbus.Client/NovaModbus.Client.csproj" />
     <Project Path="src/NovaModbus.Rtu/NovaModbus.Rtu.csproj" />
     <Project Path="src/NovaModbus.SlaveWPF/NovaModbus.SlaveWPF.csproj" />
+    <Project Path="src/NovaModbus.Slave/NovaModbus.Slave.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/NovaModbus.Rtu.Tests/NovaModbus.Rtu.Tests.csproj" />
