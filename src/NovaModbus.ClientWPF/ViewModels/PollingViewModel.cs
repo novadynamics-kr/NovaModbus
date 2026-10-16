@@ -1,7 +1,7 @@
 using System.Collections.ObjectModel;
 using NovaModbus.Rtu.Commands;
 
-namespace NovaModbus.Client.ViewModels;
+namespace NovaModbus.ClientWPF.ViewModels;
 
 /// <summary>Periodic re-execution of the Read/Write tab request.</summary>
 public sealed class PollingViewModel : ViewModelBase, IDisposable

@@ -1,12 +1,14 @@
 <Solution>
   <Folder Name="/src/">
+    <Project Path="src/NovaModbus.ClientWPF/NovaModbus.ClientWPF.csproj" />
     <Project Path="src/NovaModbus.Client/NovaModbus.Client.csproj" />
     <Project Path="src/NovaModbus.Rtu/NovaModbus.Rtu.csproj" />
     <Project Path="src/NovaModbus.Slave/NovaModbus.Slave.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/NovaModbus.Rtu.Tests/NovaModbus.Rtu.Tests.csproj" />
-    <Project Path="tests/NovaModbus.Client.Tests/NovaModbus.Client.Tests.csproj" />
+    <Project Path="tests/NovaModbus.ClientWPF.Tests/NovaModbus.ClientWPF.Tests.csproj" />
+    <Project Path="tests/NovaModbus.Client.WinForms.Tests/NovaModbus.Client.WinForms.Tests.csproj" />
     <Project Path="tests/NovaModbus.Slave.Tests/NovaModbus.Slave.Tests.csproj" />
   </Folder>
 </Solution>

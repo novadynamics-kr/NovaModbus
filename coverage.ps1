@@ -11,7 +11,8 @@ dotnet test NovaModbus.slnx -c Release --settings CodeCoverage.runsettings --col
 # Latest Cobertura per test project (ReportGenerator merges them).
 $reports = @(
     'tests/NovaModbus.Rtu.Tests',
-    'tests/NovaModbus.Client.Tests',
+    'tests/NovaModbus.ClientWPF.Tests',
+    'tests/NovaModbus.Client.WinForms.Tests',
     'tests/NovaModbus.Slave.Tests'
 ) | ForEach-Object {
     Get-ChildItem "$_/TestResults" -Recurse -Filter coverage.cobertura.xml -ErrorAction SilentlyContinue |

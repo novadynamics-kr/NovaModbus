@@ -1,38 +1,28 @@
-using System.Collections.ObjectModel;
 using System.ComponentModel;
-using System.Windows.Data;
 using NovaModbus.Client.Services;
 using NovaModbus.Rtu;
 using NovaModbus.Rtu.Codecs;
-using NovaModbus.Rtu.Collections;
-using NovaModbus.Rtu.Commands;
 
 namespace NovaModbus.Client.ViewModels;
 
-/// <summary>Registered watch list (entries + results). Execution lands in stage 2.</summary>
-public sealed class WatchViewModel : ViewModelBase, IDisposable
+/// <summary>Registered watch list (entries + results).</summary>
+/// <remarks>UI-affine (no ConfigureAwait(false)): bound collections mutate on the UI thread.
+/// File dialogs live in the form; this list works with plain paths.</remarks>
+public sealed class WatchList : IDisposable
 {
     private readonly Func<ModbusRtuClient?> _clientProvider;
+    private readonly HashSet<WatchEntry> _entryIndex = [];
     private bool _disposed;
-    private string _slaveIdText = "1";
-    private WatchArea _area = WatchArea.HoldingRegisters;
-    private string _startText = "0";
-    private string _addressEndText = "9";
-    private string _countText = "1";
+    private CancellationTokenSource? _autoCts;
+    private TimeSpan _autoInterval = TimeSpan.FromSeconds(1);
+    private string _statusText = string.Empty;
+    private bool _autoRefresh;
 
     /// <summary>Initializes with a live client provider (null when disconnected).</summary>
-    public WatchViewModel(Func<ModbusRtuClient?> clientProvider)
+    public WatchList(Func<ModbusRtuClient?> clientProvider)
     {
         ArgumentNullException.ThrowIfNull(clientProvider);
         _clientProvider = clientProvider;
-        AddCommand = new RelayCommand(AddEntry);
-        AddRangeCommand = new AsyncRelayCommand(AddRangeAsync, () => !IsBulkWorking, OnError);
-        ReadAllCommand = new AsyncRelayCommand(ReadAllAsync, () => !IsBusy, OnError);
-        SaveWatchCommand = new RelayCommand(SaveWatch);
-        LoadWatchCommand = new RelayCommand(LoadWatch);
-        ClearAllCommand = new RelayCommand(ClearAll);
-        SelectAllCommand = new RelayCommand(SelectAll);
-        DeselectAllCommand = new RelayCommand(DeselectAll);
     }
 
     /// <summary>Supported areas.</summary>
@@ -52,116 +42,34 @@ public sealed class WatchViewModel : ViewModelBase, IDisposable
     ];
 
     /// <summary>Registered entries.</summary>
-    public BulkObservableCollection<WatchEntry> Entries
-    {
-        get => _entries;
-        private set => SetProperty(ref _entries, value);
-    }
-
-    private BulkObservableCollection<WatchEntry> _entries = [];
+    public BindingList<WatchEntry> Entries { get; } = [];
 
     /// <summary>Result rows (1:1 with entries).</summary>
-    public BulkObservableCollection<WatchResult> Results
-    {
-        get => _results;
-        private set => SetProperty(ref _results, value);
-    }
-
-    private BulkObservableCollection<WatchResult> _results = [];
-
-    private readonly HashSet<WatchEntry> _entryIndex = [];
-
-    /// <summary>Select all entries (sets IsSelected = true on all).</summary>
-    public RelayCommand SelectAllCommand { get; }
-
-    /// <summary>Deselect all entries (sets IsSelected = false on all).</summary>
-    public RelayCommand DeselectAllCommand { get; }
+    public BindingList<WatchResult> Results { get; } = [];
 
     /// <summary>Bulk operation progress (0-100).</summary>
-    public double BulkProgress
-    {
-        get => _bulkProgress;
-        private set => SetProperty(ref _bulkProgress, value);
-    }
-
-    private double _bulkProgress;
+    public double BulkProgress { get; private set; }
 
     /// <summary>Whether a bulk operation runs.</summary>
-    public bool IsBulkWorking
-    {
-        get => _isBulkWorking;
-        private set
-        {
-            if (SetProperty(ref _isBulkWorking, value))
-            {
-                AddRangeCommand.RaiseCanExecuteChanged();
-            }
-        }
-    }
-
-    private bool _isBulkWorking;
+    public bool IsBulkWorking { get; private set; }
 
     /// <summary>New-entry slave ID text.</summary>
-    public string SlaveIdText
-    {
-        get => _slaveIdText;
-        set => SetProperty(ref _slaveIdText, value);
-    }
+    public string SlaveIdText { get; set; } = "1";
 
     /// <summary>New-entry area.</summary>
-    public WatchArea Area
-    {
-        get => _area;
-        set => SetProperty(ref _area, value);
-    }
+    public WatchArea Area { get; set; } = WatchArea.HoldingRegisters;
 
     /// <summary>New-entry start address text (decimal or 0x hex).</summary>
-    public string StartText
-    {
-        get => _startText;
-        set => SetProperty(ref _startText, value);
-    }
+    public string StartText { get; set; } = "0";
 
     /// <summary>Bulk-add end address text (decimal or 0x hex).</summary>
-    public string AddressEndText
-    {
-        get => _addressEndText;
-        set => SetProperty(ref _addressEndText, value);
-    }
+    public string AddressEndText { get; set; } = "9";
 
     /// <summary>New-entry count text (record number for files).</summary>
-    public string CountText
-    {
-        get => _countText;
-        set => SetProperty(ref _countText, value);
-    }
+    public string CountText { get; set; } = "1";
 
     /// <summary>New-entry extra text (diagnostic data bytes, file length).</summary>
-    public string ExtraText
-    {
-        get => _extraText;
-        set => SetProperty(ref _extraText, value);
-    }
-
-    private string _extraText = string.Empty;
-
-    /// <summary>Add the configured entry.</summary>
-    public RelayCommand AddCommand { get; }
-
-    /// <summary>Add entries for the address range.</summary>
-    public AsyncRelayCommand AddRangeCommand { get; }
-
-    /// <summary>Save the watch list to a JSON file.</summary>
-    public RelayCommand SaveWatchCommand { get; }
-
-    /// <summary>Load the watch list from a JSON file (replaces current).</summary>
-    public RelayCommand LoadWatchCommand { get; }
-
-    /// <summary>Clear all entries and results.</summary>
-    public RelayCommand ClearAllCommand { get; }
-
-    /// <summary>Read all entries once.</summary>
-    public AsyncRelayCommand ReadAllCommand { get; }
+    public string ExtraText { get; set; } = string.Empty;
 
     /// <summary>Auto-refresh on interval.</summary>
     public bool AutoRefresh
@@ -169,8 +77,9 @@ public sealed class WatchViewModel : ViewModelBase, IDisposable
         get => _autoRefresh;
         set
         {
-            if (SetProperty(ref _autoRefresh, value))
+            if (_autoRefresh != value)
             {
+                _autoRefresh = value;
                 if (value)
                 {
                     StartAuto();
@@ -183,44 +92,31 @@ public sealed class WatchViewModel : ViewModelBase, IDisposable
         }
     }
 
-    private bool _autoRefresh;
-    private CancellationTokenSource? _autoCts;
-    private TimeSpan _autoInterval = TimeSpan.FromSeconds(1);
-
     /// <summary>Auto-refresh interval text in milliseconds.</summary>
-    public string AutoIntervalMsText
-    {
-        get => _autoIntervalMsText;
-        set => SetProperty(ref _autoIntervalMsText, value);
-    }
-
-    private string _autoIntervalMsText = "1000";
+    public string AutoIntervalMsText { get; set; } = "1000";
 
     /// <summary>Read-all in progress.</summary>
-    public bool IsBusy
-    {
-        get => _isBusy;
-        private set
-        {
-            if (SetProperty(ref _isBusy, value))
-            {
-                ReadAllCommand.RaiseCanExecuteChanged();
-            }
-        }
-    }
-
-    private bool _isBusy;
+    public bool IsBusy { get; private set; }
 
     /// <summary>Last add/remove message.</summary>
     public string StatusText
     {
         get => _statusText;
-        set => SetProperty(ref _statusText, value);
+        private set
+        {
+            if (_statusText != value)
+            {
+                _statusText = value;
+                StatusChanged?.Invoke(this, EventArgs.Empty);
+            }
+        }
     }
 
-    private string _statusText = string.Empty;
+    /// <summary>Raised when <see cref="StatusText"/> changes.</summary>
+    public event EventHandler? StatusChanged;
 
-    private void AddEntry()
+    /// <summary>Add the configured entry.</summary>
+    public void AddEntry()
     {
         try
         {
@@ -276,34 +172,120 @@ public sealed class WatchViewModel : ViewModelBase, IDisposable
         }
 
         // Update collections and index using bulk replacement (single notification).
-        Entries.ReplaceAll(newEntries);
-        Results.ReplaceAll(newResults);
+        ReplaceAll(Entries, newEntries);
+        ReplaceAll(Results, newResults);
         _entryIndex.ExceptWith(doomed);
+    }
+
+    /// <summary>Remove rows by index (native grid selection path, no checkbox state).</summary>
+    /// <remarks>O(n) single pass. Delete-all degrades to <see cref="ClearAll"/>.</remarks>
+    public void RemoveAtIndices(IReadOnlyCollection<int> indices)
+    {
+        ArgumentNullException.ThrowIfNull(indices);
+        if (indices.Count == 0 || Entries.Count == 0)
+        {
+            return;
+        }
+
+        // Fast path: everything (or more) selected -> single clear, no per-row work.
+        if (indices.Count >= Entries.Count)
+        {
+            ClearAll();
+            return;
+        }
+
+        HashSet<int> doomed = new(indices);
+
+        int count = Entries.Count;
+        List<WatchEntry> survivors = new(count - doomed.Count);
+        List<WatchResult> survivorRows = new(count - doomed.Count);
+        List<WatchEntry> removed = new(doomed.Count);
+        for (int i = 0; i < count; i++)
+        {
+            if (doomed.Contains(i))
+            {
+                removed.Add(Entries[i]);
+            }
+            else
+            {
+                survivors.Add(Entries[i]);
+                survivorRows.Add(Results[i]);
+            }
+        }
+
+        if (removed.Count == 0)
+        {
+            return;
+        }
+
+        bool raiseEntries = Entries.RaiseListChangedEvents;
+        bool raiseResults = Results.RaiseListChangedEvents;
+        Entries.RaiseListChangedEvents = false;
+        Results.RaiseListChangedEvents = false;
+        try
+        {
+            Entries.Clear();
+            Results.Clear();
+            foreach (WatchEntry entry in survivors)
+            {
+                Entries.Add(entry);
+            }
+
+            foreach (WatchResult row in survivorRows)
+            {
+                Results.Add(row);
+            }
+        }
+        finally
+        {
+            Entries.RaiseListChangedEvents = raiseEntries;
+            Results.RaiseListChangedEvents = raiseResults;
+            Entries.ResetBindings();
+            Results.ResetBindings();
+        }
+
+        foreach (WatchEntry entry in removed)
+        {
+            _entryIndex.Remove(entry);
+        }
+
+        StatusText = $"Removed {removed.Count} entries.";
     }
 
     /// <summary>Clear all entries and results in one operation.</summary>
     public void ClearAll()
     {
-        Entries.ReplaceAll([]);
-        Results.ReplaceAll([]);
+        ReplaceAll(Entries, []);
+        ReplaceAll(Results, []);
         _entryIndex.Clear();
         StatusText = "Cleared all entries.";
     }
 
-    /// <summary>Select or clear all entries inside a deferred view refresh (single render pass).</summary>
+    /// <summary>Select or clear all entries (single render pass).</summary>
     public void SelectAllItems(bool select)
     {
-        ICollectionView entriesView = CollectionViewSource.GetDefaultView(Entries);
-        ICollectionView resultsView = CollectionViewSource.GetDefaultView(Results);
-        using (entriesView.DeferRefresh())
-        using (resultsView.DeferRefresh())
+        foreach (WatchEntry entry in Entries)
         {
-            Entries.SetAllSelected(select);
-            // Results mirror Entry.IsSelected via forwarding, which is suppressed during
-            // the bulk set: rebind realized result rows with a single Reset.
-            Results.Refresh();
+            entry.SuppressSelectionNotification = true;
         }
 
+        try
+        {
+            foreach (WatchEntry entry in Entries)
+            {
+                entry.IsSelected = select;
+            }
+        }
+        finally
+        {
+            foreach (WatchEntry entry in Entries)
+            {
+                entry.SuppressSelectionNotification = false;
+            }
+        }
+
+        Entries.ResetBindings();
+        Results.ResetBindings();
         StatusText = select ? $"All {Entries.Count} entries selected." : "Selection cleared.";
     }
 
@@ -313,22 +295,13 @@ public sealed class WatchViewModel : ViewModelBase, IDisposable
     /// <summary>Deselect all entries (sets IsSelected = false).</summary>
     public void DeselectAll() => SelectAllItems(false);
 
-    private void SaveWatch()
+    /// <summary>Save the watch list to a JSON file.</summary>
+    public void SaveWatchTo(string path)
     {
         try
         {
-            Microsoft.Win32.SaveFileDialog dialog = new()
-            {
-                Filter = "Watch list (*.json)|*.json",
-                FileName = "watchlist.json",
-            };
-            if (dialog.ShowDialog() != true)
-            {
-                return;
-            }
-
-            WatchListStore.Save(dialog.FileName, Entries);
-            StatusText = $"Saved {Entries.Count} entries to {dialog.FileName}.";
+            WatchListStore.Save(path, Entries);
+            StatusText = $"Saved {Entries.Count} entries to {path}.";
         }
         catch (Exception ex)
         {
@@ -336,20 +309,12 @@ public sealed class WatchViewModel : ViewModelBase, IDisposable
         }
     }
 
-    private void LoadWatch()
+    /// <summary>Load the watch list from a JSON file (replaces current).</summary>
+    public void LoadWatchFrom(string path)
     {
         try
         {
-            Microsoft.Win32.OpenFileDialog dialog = new()
-            {
-                Filter = "Watch list (*.json)|*.json",
-            };
-            if (dialog.ShowDialog() != true)
-            {
-                return;
-            }
-
-            WatchEntry[] loaded = WatchListStore.Load(dialog.FileName);
+            WatchEntry[] loaded = WatchListStore.Load(path);
             _entryIndex.Clear();
             List<WatchEntry> entries = new(loaded.Length);
             List<WatchResult> rows = new(loaded.Length);
@@ -362,10 +327,10 @@ public sealed class WatchViewModel : ViewModelBase, IDisposable
                 }
             }
 
-            Entries.ReplaceAll(entries);
-            Results.ReplaceAll(rows);
+            ReplaceAll(Entries, entries);
+            ReplaceAll(Results, rows);
 
-            StatusText = $"Loaded {loaded.Length} entries from {dialog.FileName}.";
+            StatusText = $"Loaded {loaded.Length} entries from {path}.";
         }
         catch (Exception ex)
         {
@@ -373,7 +338,8 @@ public sealed class WatchViewModel : ViewModelBase, IDisposable
         }
     }
 
-    private async Task ReadAllAsync(CancellationToken cancellationToken)
+    /// <summary>Read all entries once.</summary>
+    public async Task ReadAllAsync(CancellationToken cancellationToken = default)
     {
         if (IsBusy)
         {
@@ -393,7 +359,7 @@ public sealed class WatchViewModel : ViewModelBase, IDisposable
             foreach (WatchResult row in Results)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                await ReadOneAsync(client, row, cancellationToken).ConfigureAwait(false);
+                await ReadOneAsync(client, row, cancellationToken);
             }
         }
         finally
@@ -410,20 +376,20 @@ public sealed class WatchViewModel : ViewModelBase, IDisposable
             (string dec, string hex) = entry.Area switch
             {
                 WatchArea.HoldingRegisters => SplitRegisters(
-                    await client.ReadHoldingRegistersAsync(entry.SlaveId, entry.Start, entry.Count, ct).ConfigureAwait(false)),
+                    await client.ReadHoldingRegistersAsync(entry.SlaveId, entry.Start, entry.Count, ct)),
                 WatchArea.InputRegisters => SplitRegisters(
-                    await client.ReadInputRegistersAsync(entry.SlaveId, entry.Start, entry.Count, ct).ConfigureAwait(false)),
+                    await client.ReadInputRegistersAsync(entry.SlaveId, entry.Start, entry.Count, ct)),
                 WatchArea.Coils => SplitBits(
-                    await client.ReadCoilsAsync(entry.SlaveId, entry.Start, entry.Count, ct).ConfigureAwait(false)),
+                    await client.ReadCoilsAsync(entry.SlaveId, entry.Start, entry.Count, ct)),
                 WatchArea.DiscreteInputs => SplitBits(
-                    await client.ReadDiscreteInputsAsync(entry.SlaveId, entry.Start, entry.Count, ct).ConfigureAwait(false)),
-                WatchArea.ExceptionStatus => await ReadWatchStatusAsync(client, entry, ct).ConfigureAwait(false),
-                WatchArea.DiagnosticsCounter => await ReadWatchDiagnosticsAsync(client, entry, ct).ConfigureAwait(false),
-                WatchArea.CommEventCounter => await ReadWatchEventCounterAsync(client, entry, ct).ConfigureAwait(false),
-                WatchArea.CommEventLog => await ReadWatchEventLogAsync(client, entry, ct).ConfigureAwait(false),
-                WatchArea.ServerId => await ReadWatchServerIdAsync(client, entry, ct).ConfigureAwait(false),
-                WatchArea.FileRecord => await ReadWatchFileAsync(client, entry, ct).ConfigureAwait(false),
-                WatchArea.FifoQueue => await ReadWatchFifoAsync(client, entry, ct).ConfigureAwait(false),
+                    await client.ReadDiscreteInputsAsync(entry.SlaveId, entry.Start, entry.Count, ct)),
+                WatchArea.ExceptionStatus => await ReadWatchStatusAsync(client, entry, ct),
+                WatchArea.DiagnosticsCounter => await ReadWatchDiagnosticsAsync(client, entry, ct),
+                WatchArea.CommEventCounter => await ReadWatchEventCounterAsync(client, entry, ct),
+                WatchArea.CommEventLog => await ReadWatchEventLogAsync(client, entry, ct),
+                WatchArea.ServerId => await ReadWatchServerIdAsync(client, entry, ct),
+                WatchArea.FileRecord => await ReadWatchFileAsync(client, entry, ct),
+                WatchArea.FifoQueue => await ReadWatchFifoAsync(client, entry, ct),
                 _ => throw new InvalidOperationException($"Unknown area {entry.Area}."),
             };
             row.ValueDecText = dec;
@@ -455,34 +421,34 @@ public sealed class WatchViewModel : ViewModelBase, IDisposable
 
     private static async Task<(string Dec, string Hex)> ReadWatchStatusAsync(ModbusRtuClient client, WatchEntry entry, CancellationToken ct)
     {
-        byte status = await client.ReadExceptionStatusAsync(entry.SlaveId, ct).ConfigureAwait(false);
+        byte status = await client.ReadExceptionStatusAsync(entry.SlaveId, ct);
         return (status.ToString(System.Globalization.CultureInfo.InvariantCulture), $"0x{status:X2}");
     }
 
     private static async Task<(string Dec, string Hex)> ReadWatchDiagnosticsAsync(ModbusRtuClient client, WatchEntry entry, CancellationToken ct)
     {
         byte[] data = ParseExtraBytes(entry.Extra);
-        byte[] echo = await client.DiagnosticsAsync(entry.SlaveId, entry.Start, data, ct).ConfigureAwait(false);
+        byte[] echo = await client.DiagnosticsAsync(entry.SlaveId, entry.Start, data, ct);
         return ($"Sub {entry.Start} echo: {ValueFormatter.FormatBytesDec(echo)}", ValueFormatter.FormatBytesHex(echo));
     }
 
     private static async Task<(string Dec, string Hex)> ReadWatchEventCounterAsync(ModbusRtuClient client, WatchEntry entry, CancellationToken ct)
     {
-        (ushort status, ushort events) = await client.GetCommEventCounterAsync(entry.SlaveId, ct).ConfigureAwait(false);
+        (ushort status, ushort events) = await client.GetCommEventCounterAsync(entry.SlaveId, ct);
         return ($"Status: {status}, Events: {events}", $"0x{status:X4}, 0x{events:X4}");
     }
 
     private static async Task<(string Dec, string Hex)> ReadWatchEventLogAsync(ModbusRtuClient client, WatchEntry entry, CancellationToken ct)
     {
         (ushort status, ushort events, ushort messages, byte[] log) =
-            await client.GetCommEventLogAsync(entry.SlaveId, ct).ConfigureAwait(false);
+            await client.GetCommEventLogAsync(entry.SlaveId, ct);
         return ($"Status: {status}, Events: {events}, Messages: {messages} | {ValueFormatter.FormatBytesDec(log)}",
             ValueFormatter.FormatBytesHex(log));
     }
 
     private static async Task<(string Dec, string Hex)> ReadWatchServerIdAsync(ModbusRtuClient client, WatchEntry entry, CancellationToken ct)
     {
-        (byte[] id, bool running) = await client.ReportServerIdAsync(entry.SlaveId, ct).ConfigureAwait(false);
+        (byte[] id, bool running) = await client.ReportServerIdAsync(entry.SlaveId, ct);
         string hex = ValueFormatter.FormatBytesHex(id);
         string ascii = ValueFormatter.FormatDeviceId(id);
         string dec = ascii == hex
@@ -495,13 +461,13 @@ public sealed class WatchViewModel : ViewModelBase, IDisposable
     {
         ushort length = ParseExtraUshort(entry.Extra, "length");
         FileSubRequest[] subs = [new(entry.Start, entry.Count, length)];
-        ushort[][] records = await client.ReadFileRecordAsync(entry.SlaveId, subs, ct).ConfigureAwait(false);
+        ushort[][] records = await client.ReadFileRecordAsync(entry.SlaveId, subs, ct);
         return (ValueFormatter.FormatRegistersDec(records[0]), ValueFormatter.FormatRegistersHex(records[0]));
     }
 
     private static async Task<(string Dec, string Hex)> ReadWatchFifoAsync(ModbusRtuClient client, WatchEntry entry, CancellationToken ct)
     {
-        ushort[] values = await client.ReadFifoQueueAsync(entry.SlaveId, entry.Start, ct).ConfigureAwait(false);
+        ushort[] values = await client.ReadFifoQueueAsync(entry.SlaveId, entry.Start, ct);
         return values.Length == 0
             ? ("(empty queue)", "—")
             : (ValueFormatter.FormatRegistersDec(values), ValueFormatter.FormatRegistersHex(values));
@@ -539,15 +505,12 @@ public sealed class WatchViewModel : ViewModelBase, IDisposable
         return value;
     }
 
-    private void OnError(Exception ex) => StatusText = $"Error: {ex.Message}";
-
     private void StartAuto()
     {
         if (!int.TryParse(AutoIntervalMsText, out int ms) || ms <= 0)
         {
             StatusText = $"Invalid interval: '{AutoIntervalMsText}'.";
             _autoRefresh = false;
-            NotifyPropertyChanged(nameof(AutoRefresh));
             return;
         }
 
@@ -591,7 +554,6 @@ public sealed class WatchViewModel : ViewModelBase, IDisposable
         try
         {
             using PeriodicTimer timer = new(_autoInterval);
-            // Intentionally UI-affine (no ConfigureAwait(false)): Results is bound.
             while (await timer.WaitForNextTickAsync(ct))
             {
                 await ReadAllAsync(ct);
@@ -605,21 +567,11 @@ public sealed class WatchViewModel : ViewModelBase, IDisposable
         {
             StatusText = $"Auto-refresh stopped: {ex.Message}";
             _autoRefresh = false;
-            NotifyPropertyChanged(nameof(AutoRefresh));
         }
     }
 
-    private WatchEntry ParseEntry()
-    {
-        byte slaveId = ParseSlaveId();
-        ushort start = ParseUshortHex(StartText, "address");
-        ushort count = ParseCount();
-        ValidateEntryLimits(count);
-        ValidateExtra();
-        return new WatchEntry(slaveId, Area, start, count, ExtraText.Trim());
-    }
-
-    private async Task AddRangeAsync(CancellationToken cancellationToken)
+    /// <summary>Add entries for the address range.</summary>
+    public async Task AddRangeAsync(CancellationToken cancellationToken = default)
     {
         byte slaveId;
         ushort start;
@@ -659,9 +611,12 @@ public sealed class WatchViewModel : ViewModelBase, IDisposable
         BulkProgress = 0;
         try
         {
+            // Progress<T> marshals back to the UI thread.
+            var progress = new Progress<double>(v => BulkProgress = v);
+            int range = end - start + 1;
             List<WatchEntry> fresh = await Task.Run(() =>
             {
-                List<WatchEntry> batch = new(end - start + 1);
+                List<WatchEntry> batch = new(range);
                 for (int address = start; address <= end; address++)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
@@ -676,20 +631,20 @@ public sealed class WatchViewModel : ViewModelBase, IDisposable
 
                     if ((address - start) % 512 == 0)
                     {
-                        BulkProgress = 100.0 * (address - start + 1) / (end - start + 1);
+                        ((IProgress<double>)progress).Report(100.0 * (address - start + 1) / range);
                     }
                 }
 
                 return batch;
             }, cancellationToken);
-            // Intentionally UI-affine below (no ConfigureAwait(false)):
-            // bound Entries/Results must mutate on the UI thread.
 
-            // Merge fresh entries into existing collections using bulk add (single notification).
-            Entries.AddRange(fresh);
-            Results.AddRange(fresh.Select(e => new WatchResult(e)));
+            foreach (WatchEntry entry in fresh)
+            {
+                Entries.Add(entry);
+                Results.Add(new WatchResult(entry));
+            }
 
-            StatusText = $"Added {fresh.Count}, skipped {end - start + 1 - fresh.Count}.";
+            StatusText = $"Added {fresh.Count}, skipped {range - fresh.Count}.";
         }
         catch (Exception ex)
         {
@@ -700,6 +655,35 @@ public sealed class WatchViewModel : ViewModelBase, IDisposable
             IsBulkWorking = false;
             BulkProgress = 0;
         }
+    }
+
+    private static void ReplaceAll<T>(BindingList<T> list, IReadOnlyList<T> items)
+    {
+        bool raise = list.RaiseListChangedEvents;
+        list.RaiseListChangedEvents = false;
+        try
+        {
+            list.Clear();
+            foreach (T item in items)
+            {
+                list.Add(item);
+            }
+        }
+        finally
+        {
+            list.RaiseListChangedEvents = raise;
+            list.ResetBindings();
+        }
+    }
+
+    private WatchEntry ParseEntry()
+    {
+        byte slaveId = ParseSlaveId();
+        ushort start = ParseUshortHex(StartText, "address");
+        ushort count = ParseCount();
+        ValidateEntryLimits(count);
+        ValidateExtra();
+        return new WatchEntry(slaveId, Area, start, count, ExtraText.Trim());
     }
 
     private byte ParseSlaveId()

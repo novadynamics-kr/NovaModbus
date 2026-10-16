@@ -1,6 +1,6 @@
 using NovaModbus.Client.Services;
 
-namespace NovaModbus.Client.Tests;
+namespace NovaModbus.Client.WinForms.Tests;
 
 [TestClass]
 public sealed class ValueFormatterTests

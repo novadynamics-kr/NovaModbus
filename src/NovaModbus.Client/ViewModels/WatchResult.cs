@@ -4,7 +4,7 @@ using System.ComponentModel;
 using NovaModbus.Rtu.Collections;
 
 /// <summary>Display row for one <see cref="WatchEntry"/>.</summary>
-public sealed class WatchResult : ViewModelBase, ISelectable
+public sealed class WatchResult : INotifyPropertyChanged, ISelectable
 {
     private string _valueDecText = "-";
     private string _valueHexText = "—";
@@ -36,40 +36,55 @@ public sealed class WatchResult : ViewModelBase, ISelectable
         set => Entry.SuppressSelectionNotification = value;
     }
 
+    /// <inheritdoc />
+    public event PropertyChangedEventHandler? PropertyChanged;
+
     private void OnEntryChanged(object? sender, PropertyChangedEventArgs e)
     {
         // Forward so the results grid refreshes when the entry is (de)selected elsewhere.
         if (e.PropertyName == nameof(WatchEntry.IsSelected))
         {
-            NotifyPropertyChanged(nameof(IsSelected));
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsSelected)));
         }
+    }
+
+    private bool SetText(ref string field, string value, string propertyName)
+    {
+        if (field == value)
+        {
+            return false;
+        }
+
+        field = value;
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        return true;
     }
 
     /// <summary>Decimal values.</summary>
     public string ValueDecText
     {
         get => _valueDecText;
-        set => SetProperty(ref _valueDecText, value);
+        set => SetText(ref _valueDecText, value, nameof(ValueDecText));
     }
 
     /// <summary>Hex values.</summary>
     public string ValueHexText
     {
         get => _valueHexText;
-        set => SetProperty(ref _valueHexText, value);
+        set => SetText(ref _valueHexText, value, nameof(ValueHexText));
     }
 
     /// <summary>Last read time.</summary>
     public string Timestamp
     {
         get => _timestamp;
-        set => SetProperty(ref _timestamp, value);
+        set => SetText(ref _timestamp, value, nameof(Timestamp));
     }
 
     /// <summary>OK or error message.</summary>
     public string Status
     {
         get => _status;
-        set => SetProperty(ref _status, value);
+        set => SetText(ref _status, value, nameof(Status));
     }
 }
